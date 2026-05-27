@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}首页仪表盘{% endblock %}
+{% block page_title %}首页仪表盘{% endblock %}
+
+{% block extra_head %}
+<script src="../static/cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>首页仪表盘</h1>
+  <p>台州海昌物流有限公司 进销存管理系统概览</p>
+</div>
+
+<div class="row g-3 mb-4" id="stat-cards">
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="stat-label">物料种类</div>
+          <div class="stat-value" id="stat-materials">—</div>
+        </div>
+        <div class="stat-icon text-primary"><i class="bi bi-box"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="stat-label">库存预警物料</div>
+          <div class="stat-value text-danger" id="stat-lowstock">—</div>
+        </div>
+        <div class="stat-icon text-danger"><i class="bi bi-exclamation-triangle"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="stat-label">本月采购金额</div>
+          <div class="stat-value text-success" id="stat-purchase">—</div>
+        </div>
+        <div class="stat-icon text-success"><i class="bi bi-cart-check"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="stat-label">本月领料金额</div>
+          <div class="stat-value text-warning" id="stat-req">—</div>
+        </div>
+        <div class="stat-icon text-warning"><i class="bi bi-clipboard-check"></i></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-graph-up me-2"></i>采购金额趋势（近6个月）</div>
+      <div class="card-body">
+        <canvas id="purchaseChart" height="120"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-archive me-2"></i>库存状态</div>
+      <div class="card-body d-flex align-items-center justify-content-center">
+        <canvas id="stockChart" height="180"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-gear me-2"></i>按设备领料金额 TOP10</div>
+      <div class="card-body">
+        <canvas id="equipmentChart" height="180"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-person me-2"></i>按人员领料金额 TOP10</div>
+      <div class="card-body">
+        <canvas id="personnelChart" height="180"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+fetch('/reports/api/dashboard').then(r=>r.json()).then(data => {
+  document.getElementById('stat-materials').textContent = data.total_materials;
+  document.getElementById('stat-lowstock').textContent = data.low_stock_count;
+
+  const pt = data.purchase_trend;
+  const currentMonth = pt[pt.length-1]?.amount || 0;
+  document.getElementById('stat-purchase').textContent = '¥' + currentMonth.toLocaleString();
+
+  const eqTotal = data.equipment_stats.reduce((s,r)=>s+r.total_amt,0);
+  document.getElementById('stat-req').textContent = '¥' + eqTotal.toLocaleString();
+
+  // Purchase trend chart
+  new Chart(document.getElementById('purchaseChart'), {
+    type: 'line',
+    data: {
+      labels: pt.map(r=>r.month),
+      datasets: [{
+        label: '采购金额(元)',
+        data: pt.map(r=>r.amount),
+        borderColor: '#1a56db', backgroundColor: 'rgba(26,86,219,.08)',
+        tension: 0.4, fill: true, pointBackgroundColor: '#1a56db',
+      }]
+    },
+    options: { responsive:true, plugins:{legend:{display:false}},
+      scales:{y:{beginAtZero:true, grid:{color:'#f1f5f9'}}, x:{grid:{display:false}}} }
+  });
+
+  // Stock donut
+  const normal = data.total_materials - data.low_stock_count;
+  new Chart(document.getElementById('stockChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['正常库存', '库存预警'],
+      datasets: [{ data: [normal, data.low_stock_count],
+        backgroundColor: ['#22c55e','#ef4444'], borderWidth: 0 }]
+    },
+    options: { responsive:true, cutout:'65%',
+      plugins:{ legend:{ position:'bottom', labels:{font:{size:12}} } } }
+  });
+
+  // Equipment chart
+  const eq = data.equipment_stats;
+  new Chart(document.getElementById('equipmentChart'), {
+    type: 'bar',
+    data: {
+      labels: eq.map(r=>r.equipment_name),
+      datasets: [{ label:'领料金额(元)', data: eq.map(r=>r.total_amt),
+        backgroundColor:'rgba(26,86,219,.7)', borderRadius:4 }]
+    },
+    options: { responsive:true, indexAxis:'y',
+      plugins:{legend:{display:false}},
+      scales:{x:{beginAtZero:true,grid:{color:'#f1f5f9'}},y:{grid:{display:false}}} }
+  });
+
+  // Personnel chart
+  const ps = data.personnel_stats;
+  new Chart(document.getElementById('personnelChart'), {
+    type: 'bar',
+    data: {
+      labels: ps.map(r=>r.name),
+      datasets: [{ label:'领料金额(元)', data: ps.map(r=>r.total_amt),
+        backgroundColor:'rgba(234,179,8,.7)', borderRadius:4 }]
+    },
+    options: { responsive:true, indexAxis:'y',
+      plugins:{legend:{display:false}},
+      scales:{x:{beginAtZero:true,grid:{color:'#f1f5f9'}},y:{grid:{display:false}}} }
+  });
+});
+</script>
+{% endblock %}

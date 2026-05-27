@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}台州海昌物流有限公司 - 进销存系统{% endblock %}</title>
+<link href="../static/cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="../static/cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+:root {
+  --sidebar-bg: #0f172a; --sidebar-text: #cbd5e1;
+  --sidebar-hover: #1e293b; --sidebar-active: #1a56db;
+  --sidebar-width: 240px; --header-height: 56px; --primary: #1a56db;
+}
+body { background: #f1f5f9; font-family: 'Microsoft YaHei', sans-serif; }
+#sidebar {
+  position: fixed; left: 0; top: 0; bottom: 0; width: var(--sidebar-width);
+  background: var(--sidebar-bg); z-index: 100; overflow-y: auto;
+}
+#sidebar .logo {
+  padding: 16px 20px; border-bottom: 1px solid #1e293b;
+  color: #fff; font-size: 13px; font-weight: 600; line-height: 1.4;
+}
+#sidebar .logo .logo-icon { font-size: 24px; color: var(--primary); margin-bottom: 4px; }
+.nav-section { padding: 12px 16px 4px; font-size: 10px; color: #64748b; letter-spacing: .8px; text-transform: uppercase; }
+.nav-item-link {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 20px; color: var(--sidebar-text); text-decoration: none;
+  font-size: 13.5px; transition: all .2s;
+}
+.nav-item-link:hover { background: var(--sidebar-hover); color: #fff; }
+.nav-item-link.active { background: var(--primary); color: #fff; }
+.nav-item-link i { font-size: 16px; width: 18px; }
+#main-content { margin-left: var(--sidebar-width); min-height: 100vh; }
+#topbar {
+  height: var(--header-height); background: #fff;
+  border-bottom: 1px solid #e2e8f0; display: flex;
+  align-items: center; justify-content: space-between;
+  padding: 0 24px; position: sticky; top: 0; z-index: 99;
+}
+.topbar-title { font-size: 15px; font-weight: 600; color: #1e293b; }
+.topbar-user { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #475569; }
+.content-area { padding: 24px; }
+.page-header { margin-bottom: 20px; }
+.page-header h1 { font-size: 20px; font-weight: 600; color: #1e293b; margin: 0; }
+.page-header p { font-size: 13px; color: #64748b; margin: 4px 0 0; }
+.card { border: 1px solid #e2e8f0; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+.card-header { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 14px 20px; font-weight: 600; font-size: 14px; }
+.stat-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; }
+.stat-card .stat-value { font-size: 28px; font-weight: 700; color: #1e293b; }
+.stat-card .stat-label { font-size: 12px; color: #64748b; margin-top: 4px; }
+.stat-card .stat-icon { font-size: 28px; }
+.table th { font-size: 12px; color: #64748b; font-weight: 600; background: #f8fafc; white-space: nowrap; }
+.table td { font-size: 13px; color: #374151; vertical-align: middle; }
+.table-hover tbody tr:hover { background: #f0f4ff; }
+.badge-role { font-size: 11px; padding: 3px 8px; border-radius: 20px; }
+.btn-primary { background: var(--primary); border-color: var(--primary); }
+.btn-primary:hover { background: #1447b0; border-color: #1447b0; }
+.low-stock-row { background: #fef2f2 !important; }
+.low-stock-row td { color: #dc2626; }
+</style>
+{% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<div id="sidebar">
+  <div class="logo">
+    <div class="logo-icon"><i class="bi bi-box-seam"></i></div>
+    台州海昌物流<br>进销存管理系统
+  </div>
+
+  <div class="nav-section">主菜单</div>
+  <a href="/" class="nav-item-link {% if request.url.path == '/' %}active{% endif %}">
+    <i class="bi bi-speedometer2"></i> 首页仪表盘
+  </a>
+
+  {# 采购管理：管理员 + 采购员 可见新建；其余角色只看台账 #}
+  {% if user %}
+  <div class="nav-section">采购管理</div>
+  {% if user.role in ['管理员', '采购员'] %}
+  <a href="/purchase" class="nav-item-link {% if '/purchase' in request.url.path and 'ledger' not in request.url.path %}active{% endif %}">
+    <i class="bi bi-cart-plus"></i> 新建采购单
+  </a>
+  {% endif %}
+  <a href="/purchase/ledger" class="nav-item-link {% if 'purchase/ledger' in request.url.path %}active{% endif %}">
+    <i class="bi bi-journal-text"></i> 采购台账
+  </a>
+  {% endif %}
+
+  {# 领料管理：管理员 + 仓管员 可新建；其余只看台账 #}
+  {% if user %}
+  <div class="nav-section">领料管理</div>
+  {% if user.role in ['管理员', '仓管员'] %}
+  <a href="/requisition" class="nav-item-link {% if '/requisition' in request.url.path and 'ledger' not in request.url.path and 'api' not in request.url.path %}active{% endif %}">
+    <i class="bi bi-clipboard-plus"></i> 新建领料单
+  </a>
+  {% endif %}
+  <a href="/requisition/ledger" class="nav-item-link {% if 'requisition/ledger' in request.url.path %}active{% endif %}">
+    <i class="bi bi-journal-richtext"></i> 领料台账
+  </a>
+  <a href="/warehouse" class="nav-item-link {% if '/warehouse' in request.url.path %}active{% endif %}">
+    <i class="bi bi-archive"></i> 库存管理
+  </a>
+  {% endif %}
+
+  {% if user %}
+  <div class="nav-section">统计报表</div>
+  <a href="/reports" class="nav-item-link {% if '/reports' in request.url.path %}active{% endif %}">
+    <i class="bi bi-bar-chart-line"></i> 统计报表
+  </a>
+  {% endif %}
+
+  {% if user and user.role == '管理员' %}
+  <div class="nav-section">基础数据</div>
+  <a href="/materials" class="nav-item-link {% if '/materials' in request.url.path %}active{% endif %}">
+    <i class="bi bi-box"></i> 物料管理
+  </a>
+  <a href="/personnel" class="nav-item-link {% if '/personnel' in request.url.path %}active{% endif %}">
+    <i class="bi bi-people"></i> 人员管理
+  </a>
+  <a href="/equipment" class="nav-item-link {% if '/equipment' in request.url.path %}active{% endif %}">
+    <i class="bi bi-gear"></i> 设备管理
+  </a>
+  <a href="/users" class="nav-item-link {% if '/users' in request.url.path %}active{% endif %}">
+    <i class="bi bi-shield-lock"></i> 用户管理
+  </a>
+  <div class="nav-section">系统管理</div>
+  <a href="/logs" class="nav-item-link {% if '/logs' in request.url.path %}active{% endif %}">
+    <i class="bi bi-clock-history"></i> 操作日志
+  </a>
+  {% endif %}
+</div>
+
+<div id="main-content">
+  <div id="topbar">
+    <div class="topbar-title">{% block page_title %}台州海昌物流有限公司{% endblock %}</div>
+    <div class="topbar-user">
+      {% if user %}
+      <i class="bi bi-person-circle fs-5"></i>
+      <span>{{ user.full_name }}</span>
+      <span class="badge bg-primary badge-role">{{ user.role }}</span>
+      <a href="/logout" class="btn btn-sm btn-outline-secondary ms-2">
+        <i class="bi bi-box-arrow-right"></i> 退出
+      </a>
+      {% endif %}
+    </div>
+  </div>
+  <div class="content-area">
+    {% block content %}{% endblock %}
+  </div>
+</div>
+
+<script src="../static/cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

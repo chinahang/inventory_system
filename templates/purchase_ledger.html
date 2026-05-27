@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}采购台账{% endblock %}
+{% block page_title %}采购台账{% endblock %}
+
+{% block extra_head %}
+<style>
+.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+.sortable:hover { background: #eef2ff; }
+.sort-icon { font-size: 11px; color: #94a3b8; }
+.sort-asc .sort-icon::before { content: "\F282"; }
+.sort-desc .sort-icon::before { content: "\F27E"; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header"><h1>采购台账</h1><p>查询、排序并导出采购记录</p></div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" action="/purchase/ledger" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label mb-1" style="font-size:13px;">开始日期</label>
+        <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label mb-1" style="font-size:13px;">结束日期</label>
+        <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date }}">
+      </div>
+      <div class="col-md-auto">
+        <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search me-1"></i>查询</button>
+        <a href="/purchase/ledger" class="btn btn-sm btn-outline-secondary ms-1">重置</a>
+      </div>
+      <div class="col-md-auto ms-auto d-flex gap-2">
+        <a href="/purchase/ledger/pdf?start_date={{ start_date }}&end_date={{ end_date }}"
+          class="btn btn-sm btn-outline-danger"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a>
+        <a href="/purchase/ledger/excel?start_date={{ start_date }}&end_date={{ end_date }}"
+          class="btn btn-sm btn-outline-success"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-journal-text me-2"></i>采购记录</span>
+    <span class="badge bg-primary">共 {{ rows|length }} 条</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th class="sortable" data-col="0">单号 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="1">采购日期 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="2">物料名称 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="3">型号 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="4">件数 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="5">单价(元) <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="6">总金额(元) <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="7">采购员 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="8">操作员 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th>供应商联系方式</th>
+            <th>备注</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          {% for r in rows %}
+          <tr>
+            <td><code style="font-size:11px;">{{ r.order_no }}</code></td>
+            <td>{{ r.order_date }}</td>
+            <td>{{ r.material_name }}</td>
+            <td>{{ r.material_model }}</td>
+            <td>{{ r.quantity }}</td>
+            <td>{{ "%.2f"|format(r.unit_price) }}</td>
+            <td><strong>{{ "%.2f"|format(r.total_amount) }}</strong></td>
+            <td>{{ r.purchaser }}</td>
+            <td>{{ r.operator }}</td>
+            <td><span style="font-size:12px;">{{ r.supplier_contact }}</span></td>
+            <td><span style="font-size:12px;color:#64748b;">{{ r.remark }}</span></td>
+            <td>
+              {% if user.role == '管理员' %}
+              <form method="post" action="/purchase/delete/{{ r.order_id }}" class="d-inline"
+                onsubmit="return confirm('确认删除采购单 {{ r.order_no }}？删除后库存将同步扣减。')">
+                <button type="submit" class="btn btn-sm btn-outline-danger" title="删除">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="12" class="text-center text-muted py-4">暂无数据</td></tr>
+          {% endfor %}
+        </tbody>
+        {% if rows %}
+        <tfoot class="table-light">
+          <tr>
+            <td colspan="4" class="text-end fw-semibold">合计：</td>
+            <td class="fw-bold" id="totalQty">{{ rows|sum(attribute='quantity') }}</td>
+            <td></td>
+            <td class="fw-bold text-primary" id="totalAmt">{{ "%.2f"|format(rows|sum(attribute='total_amount')) }}</td>
+            <td colspan="5"></td>
+          </tr>
+        </tfoot>
+        {% endif %}
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let sortCol = -1, sortDir = 1;
+document.querySelectorAll('.sortable').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = parseInt(th.dataset.col);
+    if (sortCol === col) { sortDir *= -1; } else { sortCol = col; sortDir = 1; }
+    document.querySelectorAll('.sortable').forEach(t => t.classList.remove('sort-asc','sort-desc'));
+    th.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
+    sortTable(col, sortDir);
+  });
+});
+function sortTable(col, dir) {
+  const tbody = document.getElementById('tableBody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  rows.sort((a, b) => {
+    const av = a.cells[col]?.innerText.trim() || '';
+    const bv = b.cells[col]?.innerText.trim() || '';
+    const an = parseFloat(av.replace(/,/g,'')), bn = parseFloat(bv.replace(/,/g,''));
+    if (!isNaN(an) && !isNaN(bn)) return (an - bn) * dir;
+    return av.localeCompare(bv, 'zh') * dir;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+  recalcFooter();
+}
+function recalcFooter() {
+  const rows = document.querySelectorAll('#tableBody tr');
+  let qty = 0, amt = 0;
+  rows.forEach(r => { qty += parseFloat(r.cells[4]?.innerText)||0; amt += parseFloat(r.cells[6]?.innerText)||0; });
+  const tq = document.getElementById('totalQty'), ta = document.getElementById('totalAmt');
+  if (tq) tq.textContent = qty;
+  if (ta) ta.textContent = amt.toFixed(2);
+}
+</script>
+{% endblock %}

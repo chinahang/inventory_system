@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% block title %}库存管理{% endblock %}
+{% block page_title %}库存管理{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+  <div><h1>库存管理</h1><p>实时库存查看与盘盈盘亏调整</p></div>
+  <div class="d-flex gap-2">
+    {% if user.role in ['管理员', '仓管员'] %}
+    <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#adjustModal">
+      <i class="bi bi-sliders me-1"></i>库存调整
+    </button>
+    {% endif %}
+    <a href="/warehouse/report/excel" class="btn btn-outline-success">
+      <i class="bi bi-file-earmark-excel me-1"></i>Excel
+    </a>
+    <a href="/warehouse/report/pdf" class="btn btn-outline-danger">
+      <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+    </a>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="stat-label">物料总种数</div>
+      <div class="stat-value">{{ rows|length }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="stat-label">库存预警</div>
+      <div class="stat-value text-danger">{{ rows|selectattr('low_stock')|list|length }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="stat-label">累计采购金额</div>
+      <div class="stat-value text-success" style="font-size:20px;">
+        ¥{{ "%.0f"|format(rows|sum(attribute='purchase_amt')) }}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="stat-label">累计领料金额</div>
+      <div class="stat-value text-warning" style="font-size:20px;">
+        ¥{{ "%.0f"|format(rows|sum(attribute='req_amt')) }}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-table me-2"></i>库存明细
+      <small class="text-muted ms-2">查询时间：{{ now }}</small>
+    </span>
+    {% set low_count = rows|selectattr('low_stock')|list|length %}
+    {% if low_count > 0 %}
+    <span class="badge bg-danger">{{ low_count }} 项库存不足</span>
+    {% endif %}
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0" id="stockTable">
+        <thead>
+          <tr>
+            <th class="sortable" data-col="0">物料编码 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="1">品名 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="2">型号 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th>单位</th>
+            <th class="sortable" data-col="4">累计采购件数 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="5">累计采购金额 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="6">累计领料件数 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="7">累计领料金额 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="8">可用件数 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="9">可用金额 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th>状态</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          {% for r in rows %}
+          <tr class="{{ 'low-stock-row' if r.low_stock else '' }}">
+            <td><code>{{ r.code }}</code></td>
+            <td><strong>{{ r.name }}</strong></td>
+            <td>{{ r.model }}</td>
+            <td>{{ r.unit }}</td>
+            <td>{{ r.purchase_qty }}</td>
+            <td>{{ r.purchase_amt }}</td>
+            <td>{{ r.req_qty }}</td>
+            <td>{{ r.req_amt }}</td>
+            <td><strong>{{ r.avail_qty }}</strong></td>
+            <td><strong>{{ r.avail_amt }}</strong></td>
+            <td>
+              {% if r.low_stock %}
+              <span class="badge bg-danger">库存不足</span>
+              {% else %}
+              <span class="badge bg-success">正常</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="11" class="text-center text-muted py-4">暂无库存数据</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% if adjustments %}
+<div class="card">
+  <div class="card-header"><i class="bi bi-clock-history me-2"></i>最近库存调整记录</div>
+  <div class="card-body p-0">
+    <table class="table table-sm mb-0">
+      <thead>
+        <tr><th>时间</th><th>物料</th><th>调整数量</th><th>调整金额</th><th>原因</th><th>操作员</th></tr>
+      </thead>
+      <tbody>
+        {% for a in adjustments %}
+        <tr>
+          <td style="font-size:12px;">{{ a.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td>{{ a.material.name if a.material else '' }}</td>
+          <td class="{{ 'text-success' if a.quantity > 0 else 'text-danger' }}">
+            {{ '+' if a.quantity > 0 else '' }}{{ a.quantity }}
+          </td>
+          <td class="{{ 'text-success' if a.amount > 0 else 'text-danger' }}">
+            {{ '+' if a.amount > 0 else '' }}{{ a.amount }}
+          </td>
+          <td>{{ a.reason }}</td>
+          <td>{{ a.operator.full_name if a.operator else '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% if user.role in ['管理员', '仓管员'] %}
+<div class="modal fade" id="adjustModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">库存调整（盘盈盘亏）</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <form method="post" action="/warehouse/adjust">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">物料 *</label>
+            <select name="material_id" class="form-select" required>
+              <option value="">请选择物料</option>
+              {% for r in rows %}
+              <option value="{{ r.id }}">{{ r.name }}（{{ r.model }}）当前：{{ r.avail_qty }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="row g-3">
+            <div class="col-6">
+              <label class="form-label">调整数量 *</label>
+              <input type="number" name="quantity" class="form-control" step="0.01"
+                placeholder="正数盘盈，负数盘亏" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label">调整金额</label>
+              <input type="number" name="amount" class="form-control" step="0.01" value="0">
+            </div>
+          </div>
+          <div class="mt-3">
+            <label class="form-label">调整原因 *</label>
+            <input type="text" name="reason" class="form-control" placeholder="盘盈/盘亏/损耗..." required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-warning">确认调整</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+.sortable:hover { background: #eef2ff; }
+.sort-icon { font-size: 11px; color: #94a3b8; }
+.sort-asc .sort-icon::before { content: "\F282"; }
+.sort-desc .sort-icon::before { content: "\F27E"; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let sortCol = -1, sortDir = 1;
+document.querySelectorAll('.sortable').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = parseInt(th.dataset.col);
+    if (sortCol === col) { sortDir *= -1; } else { sortCol = col; sortDir = 1; }
+    document.querySelectorAll('.sortable').forEach(t => t.classList.remove('sort-asc','sort-desc'));
+    th.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
+    sortTable(col, sortDir);
+  });
+});
+
+function sortTable(col, dir) {
+  const tbody = document.getElementById('tableBody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  rows.sort((a, b) => {
+    const av = a.cells[col]?.innerText.trim() || '';
+    const bv = b.cells[col]?.innerText.trim() || '';
+    const an = parseFloat(av.replace(/,/g,'')), bn = parseFloat(bv.replace(/,/g,''));
+    if (!isNaN(an) && !isNaN(bn)) return (an - bn) * dir;
+    return av.localeCompare(bv, 'zh') * dir;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+</script>
+{% endblock %}

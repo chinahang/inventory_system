@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}统计报表{% endblock %}
+{% block page_title %}统计报表{% endblock %}
+
+{% block content %}
+<div class="page-header"><h1>统计报表</h1><p>按设备或人员统计任意时间段领料数据</p></div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" action="/reports" class="row g-2 align-items-end">
+      <div class="col-md-2">
+        <label class="form-label mb-1" style="font-size:13px;">报表类型</label>
+        <select name="report_type" class="form-select form-select-sm">
+          <option value="equipment" {{ 'selected' if report_type=='equipment' }}>按设备统计</option>
+          <option value="personnel" {{ 'selected' if report_type=='personnel' }}>按人员统计</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label mb-1" style="font-size:13px;">开始日期</label>
+        <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label mb-1" style="font-size:13px;">结束日期</label>
+        <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date }}">
+      </div>
+      <div class="col-md-auto">
+        <button type="submit" class="btn btn-sm btn-primary">
+          <i class="bi bi-search me-1"></i>查询
+        </button>
+        <a href="/reports" class="btn btn-sm btn-outline-secondary ms-1">重置</a>
+      </div>
+      <div class="col-md-auto ms-auto d-flex gap-2">
+        <a href="/reports/pdf?report_type={{ report_type }}&start_date={{ start_date }}&end_date={{ end_date }}"
+          class="btn btn-sm btn-outline-danger">
+          <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+        </a>
+        <a href="/reports/excel?report_type={{ report_type }}&start_date={{ start_date }}&end_date={{ end_date }}"
+          class="btn btn-sm btn-outline-success">
+          <i class="bi bi-file-earmark-excel me-1"></i>Excel
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if report_type == 'equipment' %}
+<div class="card">
+  <div class="card-header d-flex justify-content-between">
+    <span><i class="bi bi-gear me-2"></i>按设备统计领料</span>
+    <span class="badge bg-primary">{{ equipment_rows|length }} 台设备</span>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr><th>#</th><th>设备名称</th><th>设备编码</th><th>所在部门</th>
+          <th>总领料件数</th><th>总领料金额（元）</th></tr>
+      </thead>
+      <tbody>
+        {% for r in equipment_rows %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><strong>{{ r.equipment_name }}</strong></td>
+          <td><code>{{ r.equipment_code }}</code></td>
+          <td>{{ r.department }}</td>
+          <td>{{ r.total_qty }}</td>
+          <td><strong class="text-primary">{{ r.total_amt }}</strong></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">暂无数据</td></tr>
+        {% endfor %}
+      </tbody>
+      {% if equipment_rows %}
+      <tfoot class="table-light">
+        <tr>
+          <td colspan="4" class="text-end fw-semibold">合计：</td>
+          <td class="fw-bold">{{ equipment_rows|sum(attribute='total_qty') }}</td>
+          <td class="fw-bold text-primary">
+            {{ "%.2f"|format(equipment_rows|sum(attribute='total_amt')) }}
+          </td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+{% else %}
+<div class="card">
+  <div class="card-header d-flex justify-content-between">
+    <span><i class="bi bi-person me-2"></i>按人员统计领料</span>
+    <span class="badge bg-primary">{{ personnel_rows|length }} 人</span>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr><th>#</th><th>姓名</th><th>工号</th><th>班组</th>
+          <th>总领料件数</th><th>总领料金额（元）</th></tr>
+      </thead>
+      <tbody>
+        {% for r in personnel_rows %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><strong>{{ r.name }}</strong></td>
+          <td><code>{{ r.employee_id }}</code></td>
+          <td>{{ r.team }}</td>
+          <td>{{ r.total_qty }}</td>
+          <td><strong class="text-primary">{{ r.total_amt }}</strong></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">暂无数据</td></tr>
+        {% endfor %}
+      </tbody>
+      {% if personnel_rows %}
+      <tfoot class="table-light">
+        <tr>
+          <td colspan="4" class="text-end fw-semibold">合计：</td>
+          <td class="fw-bold">{{ personnel_rows|sum(attribute='total_qty') }}</td>
+          <td class="fw-bold text-primary">
+            {{ "%.2f"|format(personnel_rows|sum(attribute='total_amt')) }}
+          </td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

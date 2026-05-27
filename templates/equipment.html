@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}设备管理{% endblock %}
+{% block page_title %}设备管理{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+  <div><h1>设备管理</h1><p>管理领料关联的生产设备信息</p></div>
+  {% if user.role == '管理员' %}
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
+    <i class="bi bi-plus-lg me-1"></i>新增设备
+  </button>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr><th>设备编码</th><th>设备名称</th><th>型号</th><th>所在部门</th>
+        {% if user.role == '管理员' %}<th>操作</th>{% endif %}</tr>
+      </thead>
+      <tbody>
+        {% for e in equipment %}
+        <tr>
+          <td><code>{{ e.code }}</code></td>
+          <td><strong>{{ e.name }}</strong></td>
+          <td>{{ e.model }}</td>
+          <td>{{ e.department }}</td>
+          {% if user.role == '管理员' %}
+          <td>
+            <button class="btn btn-sm btn-outline-primary me-1"
+              onclick="editEquip({{ e.id }},'{{ e.code }}','{{ e.name }}','{{ e.model }}','{{ e.department }}')">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <form method="post" action="/equipment/delete/{{ e.id }}" class="d-inline"
+              onsubmit="return confirm('确认删除？')">
+              <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+          {% endif %}
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-4">暂无设备数据</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal fade" id="addModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">新增设备</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <form method="post" action="/equipment/create">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-6"><label class="form-label">设备编码 *</label>
+              <input type="text" name="code" class="form-control" required></div>
+            <div class="col-6"><label class="form-label">设备名称 *</label>
+              <input type="text" name="name" class="form-control" required></div>
+            <div class="col-6"><label class="form-label">型号</label>
+              <input type="text" name="model" class="form-control"></div>
+            <div class="col-6"><label class="form-label">所在部门</label>
+              <input type="text" name="department" class="form-control"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">编辑设备</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <form method="post" id="editForm">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-6"><label class="form-label">设备编码 *</label>
+              <input type="text" name="code" id="e-code" class="form-control" required></div>
+            <div class="col-6"><label class="form-label">设备名称 *</label>
+              <input type="text" name="name" id="e-name" class="form-control" required></div>
+            <div class="col-6"><label class="form-label">型号</label>
+              <input type="text" name="model" id="e-model" class="form-control"></div>
+            <div class="col-6"><label class="form-label">所在部门</label>
+              <input type="text" name="department" id="e-dept" class="form-control"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">保存修改</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function editEquip(id, code, name, model, dept) {
+  document.getElementById('editForm').action = '/equipment/update/' + id;
+  document.getElementById('e-code').value = code;
+  document.getElementById('e-name').value = name;
+  document.getElementById('e-model').value = model;
+  document.getElementById('e-dept').value = dept;
+  new bootstrap.Modal(document.getElementById('editModal')).show();
+}
+</script>
+{% endblock %}

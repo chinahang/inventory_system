@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登录 - 台州海昌物流进销存系统</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { min-height:100vh; display:grid; grid-template-columns:1fr 1fr; font-family:'Microsoft YaHei','PingFang SC',sans-serif; }
+@media(max-width:900px){ body{ grid-template-columns:1fr; } .left-panel{ display:none; } }
+
+/* ======= LEFT PANEL ======= */
+.left-panel {
+  position:relative; background:linear-gradient(135deg,#4f46e5 0%,#6d28d9 60%,#4338ca 100%);
+  display:flex; flex-direction:column; justify-content:space-between; padding:48px;
+  overflow:hidden; color:white;
+}
+.brand { display:flex; align-items:center; gap:10px; font-size:17px; font-weight:700; position:relative; z-index:20; }
+.brand-icon {
+  width:36px; height:36px; border-radius:10px;
+  background:rgba(255,255,255,0.15); backdrop-filter:blur(8px);
+  display:flex; align-items:center; justify-content:center; font-size:18px;
+}
+.character-stage {
+  position:relative; z-index:20;
+  display:flex; align-items:flex-end; justify-content:center;
+  height:420px;
+}
+.characters { position:relative; width:520px; height:380px; }
+
+/* Characters */
+.char {
+  position:absolute; bottom:0;
+  border-radius:10px 10px 0 0;
+  transition: transform 0.7s ease-in-out, height 0.4s ease-in-out;
+  transform-origin: bottom center;
+}
+/* Purple - back */
+#cPurple { left:60px; width:175px; height:390px; background:#6C3FF5; z-index:1; }
+/* Black - mid */
+#cBlack  { left:228px; width:115px; height:300px; background:#2D2D2D; border-radius:8px 8px 0 0; z-index:2; }
+/* Orange - front left */
+#cOrange { left:0; width:230px; height:195px; background:#FF9B6B; border-radius:110px 110px 0 0; z-index:3; }
+/* Yellow - front right */
+#cYellow { left:298px; width:135px; height:225px; background:#E8D754; border-radius:68px 68px 0 0; z-index:4; }
+
+.char-eyes { position:absolute; display:flex; transition: left 0.2s ease-out, top 0.2s ease-out; }
+.eyeball {
+  border-radius:50%; display:flex; align-items:center; justify-content:center;
+  overflow:hidden; transition: height 0.15s ease;
+  background:white;
+}
+.eyeball.blink { height:2px !important; }
+.pupil {
+  border-radius:50%; background:#2D2D2D; flex-shrink:0;
+  transition: transform 0.1s ease-out;
+}
+/* pupil-only (no white bg) */
+.pupil-only { border-radius:50%; background:#2D2D2D; flex-shrink:0; transition:transform 0.1s ease-out; }
+
+
+
+/* Grid bg */
+.left-panel::before {
+  content:''; position:absolute; inset:0;
+  background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);
+  background-size:20px 20px; z-index:0;
+}
+.glow1 { position:absolute; top:25%; right:25%; width:280px; height:280px; background:rgba(255,255,255,.07); border-radius:50%; filter:blur(60px); z-index:0; }
+.glow2 { position:absolute; bottom:25%; left:20%; width:380px; height:380px; background:rgba(255,255,255,.04); border-radius:50%; filter:blur(80px); z-index:0; }
+
+/* Yellow mouth */
+.yellow-mouth {
+  position:absolute; height:4px; background:#2D2D2D; border-radius:2px;
+  transition: left .2s ease-out, top .2s ease-out;
+}
+
+/* ======= RIGHT PANEL ======= */
+.right-panel {
+  display:flex; align-items:center; justify-content:center;
+  padding:32px; background:#fff;
+}
+.form-box { width:100%; max-width:400px; }
+
+.form-title { font-size:28px; font-weight:700; color:#111827; margin-bottom:6px; text-align:center; }
+.form-sub { font-size:14px; color:#6b7280; text-align:center; margin-bottom:36px; }
+
+.form-group { margin-bottom:20px; }
+.form-label { display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:8px; }
+.form-input {
+  width:100%; height:48px; border:1.5px solid #e5e7eb;
+  border-radius:10px; padding:0 14px; font-size:14px; color:#111827;
+  background:#fff; outline:none; transition:border-color .2s, box-shadow .2s;
+  font-family:inherit;
+}
+.form-input:focus { border-color:#6d28d9; box-shadow:0 0 0 3px rgba(109,40,217,.12); }
+.pw-wrap { position:relative; }
+.pw-wrap .form-input { padding-right:44px; }
+.pw-toggle {
+  position:absolute; right:14px; top:50%; transform:translateY(-50%);
+  background:none; border:none; cursor:pointer; color:#9ca3af; padding:0;
+  display:flex; align-items:center; transition:color .2s;
+}
+.pw-toggle:hover { color:#374151; }
+
+.form-row { display:flex; justify-content:flex-end; margin-bottom:16px; }
+
+.error-msg {
+  padding:10px 14px; border-radius:8px;
+  background:rgba(220,38,38,.08); border:1px solid rgba(220,38,38,.25);
+  color:#dc2626; font-size:13px; margin-bottom:16px;
+  display:none;
+}
+.error-msg.show { display:block; }
+
+.btn-submit {
+  width:100%; height:48px; background:#6d28d9; color:#fff;
+  border:none; border-radius:10px; font-size:15px; font-weight:600;
+  cursor:pointer; transition:background .2s, transform .1s; font-family:inherit;
+}
+.btn-submit:hover { background:#5b21b6; }
+.btn-submit:active { transform:scale(.98); }
+.btn-submit:disabled { opacity:.65; cursor:not-allowed; }
+
+.hint { text-align:center; font-size:12px; color:#d1d5db; margin-top:20px; }
+</style>
+</head>
+<body>
+
+<!-- ===== LEFT PANEL ===== -->
+<div class="left-panel" id="leftPanel">
+  <div class="glow1"></div><div class="glow2"></div>
+
+  <div class="brand">
+    <div class="brand-icon">📦</div>
+    台州海昌物流有限公司
+  </div>
+
+  <div class="character-stage">
+    <div class="characters" id="stage">
+
+      <!-- Purple -->
+      <div class="char" id="cPurple">
+        <div class="char-eyes" id="eyesPurple" style="left:42px;top:38px;gap:18px;">
+          <div class="eyeball" id="ebPL" style="width:18px;height:18px;">
+            <div class="pupil" id="pPL" style="width:7px;height:7px;"></div>
+          </div>
+          <div class="eyeball" id="ebPR" style="width:18px;height:18px;">
+            <div class="pupil" id="pPR" style="width:7px;height:7px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Black -->
+      <div class="char" id="cBlack">
+        <div class="char-eyes" id="eyesBlack" style="left:24px;top:30px;gap:14px;">
+          <div class="eyeball" id="ebBL" style="width:16px;height:16px;">
+            <div class="pupil" id="pBL" style="width:6px;height:6px;"></div>
+          </div>
+          <div class="eyeball" id="ebBR" style="width:16px;height:16px;">
+            <div class="pupil" id="pBR" style="width:6px;height:6px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Orange (pupil only, no white) -->
+      <div class="char" id="cOrange">
+        <div class="char-eyes" id="eyesOrange" style="left:80px;top:88px;gap:20px;">
+          <div class="pupil-only" id="pOL" style="width:12px;height:12px;"></div>
+          <div class="pupil-only" id="pOR" style="width:12px;height:12px;"></div>
+        </div>
+      </div>
+
+      <!-- Yellow (pupil only + mouth) -->
+      <div class="char" id="cYellow">
+        <div class="char-eyes" id="eyesYellow" style="left:50px;top:38px;gap:16px;">
+          <div class="pupil-only" id="pYL" style="width:12px;height:12px;"></div>
+          <div class="pupil-only" id="pYR" style="width:12px;height:12px;"></div>
+        </div>
+        <div class="yellow-mouth" id="mouthYellow" style="width:72px;left:38px;top:86px;"></div>
+      </div>
+
+    </div>
+  </div>
+
+
+</div>
+
+<!-- ===== RIGHT PANEL ===== -->
+<div class="right-panel">
+  <div class="form-box">
+    <div class="form-title">欢迎回来！</div>
+    <div class="form-sub">请输入您的账号信息登录系统</div>
+
+    <div class="error-msg" id="errBox">
+      {% if error %}{{ error }}{% endif %}
+    </div>
+
+    <form method="post" action="/login" id="loginForm">
+      <div class="form-group">
+        <label class="form-label" for="username">用户名</label>
+        <input type="text" name="username" id="usernameInput" class="form-input"
+          placeholder="请输入用户名" autocomplete="username" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">密码</label>
+        <div class="pw-wrap">
+          <input type="password" name="password" id="passwordInput" class="form-input"
+            placeholder="••••••••" autocomplete="current-password" required>
+          <button type="button" class="pw-toggle" id="pwToggle" onclick="togglePw()">
+            <svg id="eyeIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <span style="font-size:13px;color:#6d28d9;cursor:pointer;">忘记密码？</span>
+      </div>
+
+      <button type="submit" class="btn-submit" id="submitBtn">登录系统</button>
+    </form>
+
+    <div class="hint">默认账号 admin / admin123</div>
+  </div>
+</div>
+
+<script>
+// ===== State =====
+let mouseX = 0, mouseY = 0;
+let isTyping = false, showPw = false;
+let isLookingAtEachOther = false, lookTimer = null;
+let isPurplePeeking = false, peekTimer = null;
+let pwHasContent = false;
+let purpleBlink = false, blackBlink = false;
+
+// ===== DOM refs =====
+const cPurple = document.getElementById('cPurple');
+const cBlack  = document.getElementById('cBlack');
+const cOrange = document.getElementById('cOrange');
+const cYellow = document.getElementById('cYellow');
+const eyesPurple = document.getElementById('eyesPurple');
+const eyesBlack  = document.getElementById('eyesBlack');
+const eyesOrange = document.getElementById('eyesOrange');
+const eyesYellow = document.getElementById('eyesYellow');
+const mouthYellow = document.getElementById('mouthYellow');
+const ebPL = document.getElementById('ebPL'), ebPR = document.getElementById('ebPR');
+const ebBL = document.getElementById('ebBL'), ebBR = document.getElementById('ebBR');
+const pPL = document.getElementById('pPL'),   pPR = document.getElementById('pPR');
+const pBL = document.getElementById('pBL'),   pBR = document.getElementById('pBR');
+const pOL = document.getElementById('pOL'),   pOR = document.getElementById('pOR');
+const pYL = document.getElementById('pYL'),   pYR = document.getElementById('pYR');
+const usernameInput = document.getElementById('usernameInput');
+const passwordInput = document.getElementById('passwordInput');
+
+// ===== Mouse tracking =====
+document.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; });
+
+// ===== Helpers =====
+function getCharCenter(el) {
+  const r = el.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 3 };
+}
+function clamp(v, mn, mx) { return Math.max(mn, Math.min(mx, v)); }
+
+function calcCharPos(el) {
+  const c = getCharCenter(el);
+  const dx = mouseX - c.x, dy = mouseY - c.y;
+  return {
+    faceX: clamp(dx / 20, -15, 15),
+    faceY: clamp(dy / 30, -10, 10),
+    bodySkew: clamp(-dx / 120, -6, 6),
+  };
+}
+
+function calcEyeOffset(eyeEl) {
+  const r = eyeEl.getBoundingClientRect();
+  const cx = r.left + r.width/2, cy = r.top + r.height/2;
+  const dx = mouseX - cx, dy = mouseY - cy;
+  const dist = Math.min(Math.sqrt(dx*dx+dy*dy), 5);
+  const ang = Math.atan2(dy, dx);
+  return { x: Math.cos(ang)*dist, y: Math.sin(ang)*dist };
+}
+
+function setPupilTransform(pupilEl, x, y) {
+  pupilEl.style.transform = `translate(${x.toFixed(2)}px,${y.toFixed(2)}px)`;
+}
+
+// ===== Blink =====
+function scheduleBlink(setFn, elA, elB, size) {
+  const delay = 3000 + Math.random() * 4000;
+  setTimeout(() => {
+    setFn(true);
+    elA.style.height = '2px'; elB.style.height = '2px';
+    setTimeout(() => {
+      setFn(false);
+      elA.style.height = size + 'px'; elB.style.height = size + 'px';
+      scheduleBlink(setFn, elA, elB, size);
+    }, 150);
+  }, delay);
+}
+scheduleBlink(v => purpleBlink = v, ebPL, ebPR, 18);
+scheduleBlink(v => blackBlink  = v, ebBL, ebBR, 16);
+
+// ===== Typing events =====
+[usernameInput, passwordInput].forEach(inp => {
+  inp.addEventListener('focus', () => {
+    isTyping = true;
+    if (lookTimer) clearTimeout(lookTimer);
+    setLookingAtEachOther(true);
+    lookTimer = setTimeout(() => setLookingAtEachOther(false), 800);
+  });
+  inp.addEventListener('blur', () => {
+    isTyping = false;
+    setLookingAtEachOther(false);
+  });
+});
+
+passwordInput.addEventListener('input', () => {
+  pwHasContent = passwordInput.value.length > 0;
+});
+
+function setLookingAtEachOther(v) {
+  isLookingAtEachOther = v;
+}
+
+// Password show/hide
+function togglePw() {
+  showPw = !showPw;
+  passwordInput.type = showPw ? 'text' : 'password';
+  const svg = document.getElementById('eyeIcon');
+  if (showPw) {
+    svg.innerHTML = `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>`;
+  } else {
+    svg.innerHTML = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
+  }
+}
+
+// ===== Main animation loop =====
+function animate() {
+  const passwordVisible = pwHasContent && showPw;
+  const passwordHidden  = pwHasContent && !showPw;
+
+  // --- Purple character ---
+  const pp = calcCharPos(cPurple);
+  let purpleH = (isTyping || passwordHidden) ? 440 : 390;
+  cPurple.style.height = purpleH + 'px';
+  let purpleSkew = passwordVisible
+    ? 0
+    : (isTyping || passwordHidden)
+      ? (pp.bodySkew - 12)
+      : pp.bodySkew;
+  let purpleTranslateX = (isTyping || passwordHidden) ? 40 : 0;
+  cPurple.style.transform = `skewX(${purpleSkew}deg) translateX(${purpleTranslateX}px)`;
+
+  // Purple eyes position
+  let pEyeLeft, pEyeTop;
+  if (passwordVisible) {
+    pEyeLeft = 20; pEyeTop = 35;
+  } else if (isLookingAtEachOther) {
+    pEyeLeft = 55; pEyeTop = 65;
+  } else {
+    pEyeLeft = 45 + pp.faceX; pEyeTop = 40 + pp.faceY;
+  }
+  eyesPurple.style.left = pEyeLeft + 'px';
+  eyesPurple.style.top  = pEyeTop  + 'px';
+
+  // Purple pupils
+  if (passwordVisible) {
+    const px = isPurplePeeking ? 4 : -4, py = isPurplePeeking ? 5 : -4;
+    setPupilTransform(pPL, px, py); setPupilTransform(pPR, px, py);
+  } else if (isLookingAtEachOther) {
+    setPupilTransform(pPL, 3, 4); setPupilTransform(pPR, 3, 4);
+  } else {
+    const o = calcEyeOffset(ebPL);
+    setPupilTransform(pPL, o.x, o.y); setPupilTransform(pPR, o.x, o.y);
+  }
+
+  // --- Black character ---
+  const bp = calcCharPos(cBlack);
+  let blackSkew = passwordVisible
+    ? 0
+    : isLookingAtEachOther
+      ? bp.bodySkew * 1.5 + 10
+      : (isTyping || passwordHidden)
+        ? bp.bodySkew * 1.5
+        : bp.bodySkew;
+  let blackTranslateX = isLookingAtEachOther ? 20 : 0;
+  cBlack.style.transform = `skewX(${blackSkew}deg) translateX(${blackTranslateX}px)`;
+
+  let bEyeLeft, bEyeTop;
+  if (passwordVisible) {
+    bEyeLeft = 10; bEyeTop = 28;
+  } else if (isLookingAtEachOther) {
+    bEyeLeft = 32; bEyeTop = 12;
+  } else {
+    bEyeLeft = 24 + bp.faceX; bEyeTop = 30 + bp.faceY;
+  }
+  eyesBlack.style.left = bEyeLeft + 'px';
+  eyesBlack.style.top  = bEyeTop  + 'px';
+
+  if (passwordVisible) {
+    setPupilTransform(pBL, -4, -4); setPupilTransform(pBR, -4, -4);
+  } else if (isLookingAtEachOther) {
+    setPupilTransform(pBL, 0, -4); setPupilTransform(pBR, 0, -4);
+  } else {
+    const o = calcEyeOffset(ebBL);
+    setPupilTransform(pBL, o.x, o.y); setPupilTransform(pBR, o.x, o.y);
+  }
+
+  // --- Orange character ---
+  const op = calcCharPos(cOrange);
+  let orangeSkew = passwordVisible ? 0 : op.bodySkew;
+  cOrange.style.transform = `skewX(${orangeSkew}deg)`;
+
+  let oEyeLeft = passwordVisible ? 50 : (82 + op.faceX);
+  let oEyeTop  = passwordVisible ? 85 : (90 + op.faceY);
+  eyesOrange.style.left = oEyeLeft + 'px';
+  eyesOrange.style.top  = oEyeTop  + 'px';
+
+  if (passwordVisible) {
+    setPupilTransform(pOL, -5, -4); setPupilTransform(pOR, -5, -4);
+  } else {
+    const r = pOL.getBoundingClientRect();
+    const dx = mouseX-(r.left+6), dy = mouseY-(r.top+6);
+    const dist = Math.min(Math.sqrt(dx*dx+dy*dy), 5);
+    const ang = Math.atan2(dy, dx);
+    const ox = Math.cos(ang)*dist, oy = Math.sin(ang)*dist;
+    setPupilTransform(pOL, ox, oy); setPupilTransform(pOR, ox, oy);
+  }
+
+  // --- Yellow character ---
+  const yp = calcCharPos(cYellow);
+  let yellowSkew = passwordVisible ? 0 : yp.bodySkew;
+  cYellow.style.transform = `skewX(${yellowSkew}deg)`;
+
+  let yEyeLeft = passwordVisible ? 20 : (52 + yp.faceX);
+  let yEyeTop  = passwordVisible ? 35 : (40 + yp.faceY);
+  eyesYellow.style.left = yEyeLeft + 'px';
+  eyesYellow.style.top  = yEyeTop  + 'px';
+
+  let yMouthLeft = passwordVisible ? 10 : (40 + yp.faceX);
+  let yMouthTop  = passwordVisible ? 88 : (88 + yp.faceY);
+  mouthYellow.style.left = yMouthLeft + 'px';
+  mouthYellow.style.top  = yMouthTop  + 'px';
+
+  if (passwordVisible) {
+    setPupilTransform(pYL, -5, -4); setPupilTransform(pYR, -5, -4);
+  } else {
+    const r = pYL.getBoundingClientRect();
+    const dx = mouseX-(r.left+6), dy = mouseY-(r.top+6);
+    const dist = Math.min(Math.sqrt(dx*dx+dy*dy), 5);
+    const ang = Math.atan2(dy, dx);
+    const ox = Math.cos(ang)*dist, oy = Math.sin(ang)*dist;
+    setPupilTransform(pYL, ox, oy); setPupilTransform(pYR, ox, oy);
+  }
+
+  requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
+
+// ===== Purple peeking when password visible =====
+function schedulePeek() {
+  if (!(pwHasContent && showPw)) { isPurplePeeking = false; return; }
+  peekTimer = setTimeout(() => {
+    isPurplePeeking = true;
+    setTimeout(() => {
+      isPurplePeeking = false;
+      schedulePeek();
+    }, 800);
+  }, 2000 + Math.random() * 3000);
+}
+passwordInput.addEventListener('input', () => {
+  if (pwHasContent && showPw) schedulePeek();
+});
+
+// ===== Error display =====
+{% if error %}
+document.getElementById('errBox').classList.add('show');
+{% endif %}
+
+// ===== Submit =====
+document.getElementById('loginForm').addEventListener('submit', () => {
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = '登录中...';
+});
+</script>
+</body>
+</html>

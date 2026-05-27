@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block title %}操作日志{% endblock %}
+{% block page_title %}操作日志{% endblock %}
+
+{% block extra_head %}
+<style>
+.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+.sortable:hover { background: #eef2ff; }
+.sort-icon { font-size: 11px; color: #94a3b8; }
+.sort-asc .sort-icon::before { content: "\F282"; }
+.sort-desc .sort-icon::before { content: "\F27E"; }
+.action-badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+  <div>
+    <h1>操作日志</h1>
+    <p>记录所有用户的操作行为，仅管理员可见</p>
+  </div>
+</div>
+
+<!-- Filter bar -->
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" action="/logs" class="row g-2 align-items-end">
+      <div class="col-md-2">
+        <label class="form-label mb-1" style="font-size:13px;">开始日期</label>
+        <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1" style="font-size:13px;">结束日期</label>
+        <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1" style="font-size:13px;">模块</label>
+        <select name="module" class="form-select form-select-sm">
+          <option value="">全部模块</option>
+          {% for m in all_modules %}
+          <option value="{{ m }}" {% if module_filter == m %}selected{% endif %}>{{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1" style="font-size:13px;">操作类型</label>
+        <select name="action" class="form-select form-select-sm">
+          <option value="">全部操作</option>
+          {% for a in all_actions %}
+          <option value="{{ a }}" {% if action_filter == a %}selected{% endif %}>{{ a }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-auto">
+        <button type="submit" class="btn btn-sm btn-primary">
+          <i class="bi bi-search me-1"></i>查询
+        </button>
+        <a href="/logs" class="btn btn-sm btn-outline-secondary ms-1">重置</a>
+      </div>
+      <div class="col-md-auto ms-auto">
+        <span class="text-muted" style="font-size:13px;">最多显示 500 条</span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Stats cards -->
+<div class="row g-3 mb-3">
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="stat-label">查询结果总数</div>
+      <div class="stat-value">{{ logs|length }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="stat-label">新建操作</div>
+      <div class="stat-value text-success">
+        {{ logs|selectattr('action', 'equalto', '新建')|list|length }}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="stat-label">删除操作</div>
+      <div class="stat-value text-danger">
+        {{ logs|selectattr('action', 'equalto', '删除')|list|length }}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="stat-label">登录次数</div>
+      <div class="stat-value text-primary">
+        {{ logs|selectattr('action', 'equalto', '登录')|list|length }}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-clock-history me-2"></i>操作记录</span>
+    <span class="badge bg-primary">共 {{ logs|length }} 条</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th class="sortable" data-col="0">时间 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="1">用户名 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="2">操作类型 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="3">模块 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th>详细描述</th>
+            <th class="sortable" data-col="5">IP地址 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          {% for log in logs %}
+          <tr>
+            <td style="font-size:12px;white-space:nowrap;">
+              {{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}
+            </td>
+            <td>
+              <strong>{{ log.username }}</strong>
+              {% if log.user %}
+              <span class="text-muted" style="font-size:11px;">{{ log.user.full_name }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if log.action == '新建' %}
+              <span class="action-badge badge bg-success">{{ log.action }}</span>
+              {% elif log.action == '删除' %}
+              <span class="action-badge badge bg-danger">{{ log.action }}</span>
+              {% elif log.action == '修改' %}
+              <span class="action-badge badge bg-warning text-dark">{{ log.action }}</span>
+              {% elif log.action == '登录' %}
+              <span class="action-badge badge bg-primary">{{ log.action }}</span>
+              {% elif log.action == '库存调整' %}
+              <span class="action-badge badge bg-info text-dark">{{ log.action }}</span>
+              {% else %}
+              <span class="action-badge badge bg-secondary">{{ log.action }}</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge" style="background:#f1f5f9;color:#374151;font-size:11px;">
+                {{ log.module }}
+              </span>
+            </td>
+            <td style="font-size:12px;color:#475569;max-width:300px;">{{ log.detail }}</td>
+            <td style="font-size:12px;color:#94a3b8;">{{ log.ip or '—' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="text-center text-muted py-4">暂无操作记录</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let sortCol = -1, sortDir = 1;
+document.querySelectorAll('.sortable').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = parseInt(th.dataset.col);
+    if (sortCol === col) { sortDir *= -1; } else { sortCol = col; sortDir = 1; }
+    document.querySelectorAll('.sortable').forEach(t => t.classList.remove('sort-asc','sort-desc'));
+    th.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
+    sortTable(col, sortDir);
+  });
+});
+function sortTable(col, dir) {
+  const tbody = document.getElementById('tableBody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  rows.sort((a, b) => {
+    const av = a.cells[col]?.innerText.trim() || '';
+    const bv = b.cells[col]?.innerText.trim() || '';
+    const an = parseFloat(av.replace(/,/g,'')), bn = parseFloat(bv.replace(/,/g,''));
+    if (!isNaN(an) && !isNaN(bn)) return (an - bn) * dir;
+    return av.localeCompare(bv, 'zh') * dir;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+</script>
+{% endblock %}

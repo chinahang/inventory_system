@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}人员管理{% endblock %}
+{% block page_title %}人员管理{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+  <div><h1>人员管理</h1><p>管理采购员、领料人等相关人员信息</p></div>
+  {% if user.role == '管理员' %}
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
+    <i class="bi bi-plus-lg me-1"></i>新增人员
+  </button>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr><th>工号</th><th>姓名</th><th>班组</th><th>角色</th><th>联系方式</th>
+        {% if user.role == '管理员' %}<th>操作</th>{% endif %}</tr>
+      </thead>
+      <tbody>
+        {% for p in personnel %}
+        <tr>
+          <td><code>{{ p.employee_id }}</code></td>
+          <td><strong>{{ p.name }}</strong></td>
+          <td>{{ p.team }}</td>
+          <td><span class="badge bg-secondary">{{ p.role }}</span></td>
+          <td>{{ p.phone }}</td>
+          {% if user.role == '管理员' %}
+          <td>
+            <button class="btn btn-sm btn-outline-primary me-1"
+              onclick="editPerson({{ p.id }},'{{ p.employee_id }}','{{ p.name }}','{{ p.team }}','{{ p.phone }}','{{ p.role }}')">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <form method="post" action="/personnel/delete/{{ p.id }}" class="d-inline"
+              onsubmit="return confirm('确认删除？')">
+              <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+          {% endif %}
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">暂无人员数据</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal fade" id="addModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">新增人员</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <form method="post" action="/personnel/create">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-6"><label class="form-label">姓名 *</label>
+              <input type="text" name="name" class="form-control" required></div>
+            <div class="col-6"><label class="form-label">工号 *</label>
+              <input type="text" name="employee_id" class="form-control" required></div>
+            <div class="col-6"><label class="form-label">班组</label>
+              <input type="text" name="team" class="form-control"></div>
+            <div class="col-6"><label class="form-label">联系方式</label>
+              <input type="text" name="phone" class="form-control"></div>
+            <div class="col-12"><label class="form-label">角色</label>
+              <select name="role" class="form-select">
+                <option>采购员</option><option>领料人</option>
+                <option>库管员</option><option>操作员</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">编辑人员</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <form method="post" id="editForm">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-6"><label class="form-label">姓名 *</label>
+              <input type="text" name="name" id="e-name" class="form-control" required></div>
+            <div class="col-6"><label class="form-label">工号 *</label>
+              <input type="text" name="employee_id" id="e-empid" class="form-control" required></div>
+            <div class="col-6"><label class="form-label">班组</label>
+              <input type="text" name="team" id="e-team" class="form-control"></div>
+            <div class="col-6"><label class="form-label">联系方式</label>
+              <input type="text" name="phone" id="e-phone" class="form-control"></div>
+            <div class="col-12"><label class="form-label">角色</label>
+              <select name="role" id="e-role" class="form-select">
+                <option>采购员</option><option>领料人</option>
+                <option>库管员</option><option>操作员</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">保存修改</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function editPerson(id, empid, name, team, phone, role) {
+  document.getElementById('editForm').action = '/personnel/update/' + id;
+  document.getElementById('e-empid').value = empid;
+  document.getElementById('e-name').value = name;
+  document.getElementById('e-team').value = team;
+  document.getElementById('e-phone').value = phone;
+  document.getElementById('e-role').value = role;
+  new bootstrap.Modal(document.getElementById('editModal')).show();
+}
+</script>
+{% endblock %}

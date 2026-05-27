@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}领料台账{% endblock %}
+{% block page_title %}领料台账{% endblock %}
+
+{% block content %}
+<div class="page-header"><h1>领料台账</h1><p>查询、排序、导出并打印领料单据</p></div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" action="/requisition/ledger" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label mb-1" style="font-size:13px;">开始日期</label>
+        <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label mb-1" style="font-size:13px;">结束日期</label>
+        <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date }}">
+      </div>
+      <div class="col-md-auto">
+        <button type="submit" class="btn btn-sm btn-primary">
+          <i class="bi bi-search me-1"></i>查询
+        </button>
+        <a href="/requisition/ledger" class="btn btn-sm btn-outline-secondary ms-1">重置</a>
+      </div>
+      <div class="col-md-auto ms-auto d-flex gap-2">
+        <a href="/requisition/ledger/pdf?start_date={{ start_date }}&end_date={{ end_date }}"
+          class="btn btn-sm btn-outline-danger">
+          <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+        </a>
+        <a href="/requisition/ledger/excel?start_date={{ start_date }}&end_date={{ end_date }}"
+          class="btn btn-sm btn-outline-success">
+          <i class="bi bi-file-earmark-excel me-1"></i>Excel
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-journal-richtext me-2"></i>领料记录</span>
+    <span class="badge bg-primary">共 {{ rows|length }} 条</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0" id="ledgerTable">
+        <thead>
+          <tr>
+            <th class="sortable" data-col="0">单号 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="1">领料日期 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="2">物料名称 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="3">型号 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="4">件数 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="5">金额(元) <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="6">使用设备 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="7">领料人员 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th class="sortable" data-col="8">操作员 <i class="bi bi-arrow-down-up sort-icon"></i></th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          {% for r in rows %}
+          <tr>
+            <td><code style="font-size:11px;">{{ r.order_no }}</code></td>
+            <td>{{ r.order_date }}</td>
+            <td>{{ r.material_name }}</td>
+            <td>{{ r.material_model }}</td>
+            <td>{{ r.quantity }}</td>
+            <td><strong>{{ "%.2f"|format(r.total_amount) }}</strong></td>
+            <td>{{ r.equipment }}</td>
+            <td>{{ r.personnel }}</td>
+            <td>{{ r.operator }}</td>
+            <td>
+              <div class="d-flex gap-1">
+                <!-- Print button with paper size dropdown -->
+                <div class="dropdown">
+                  <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button"
+                    data-bs-toggle="dropdown" title="打印单据">
+                    <i class="bi bi-printer"></i>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end" style="min-width:150px;">
+                    <li><h6 class="dropdown-header" style="font-size:11px;">选择纸张尺寸</h6></li>
+                    <li>
+                      <a class="dropdown-item" style="font-size:13px;"
+                        href="/requisition/print/{{ r.order_id }}?paper=A4" target="_blank">
+                        <i class="bi bi-file-earmark-pdf me-2 text-danger"></i>A4 标准
+                      </a>
+                    </li>
+                    <li>
+                      <a class="dropdown-item" style="font-size:13px;"
+                        href="/requisition/print/{{ r.order_id }}?paper=voucher" target="_blank">
+                        <i class="bi bi-file-earmark-pdf me-2 text-warning"></i>财务凭证 (13.97×24.1cm)
+                      </a>
+                    </li>
+                  </ul>
+                </div>
+                {% if user.role == '管理员' %}
+                <form method="post" action="/requisition/delete/{{ r.order_id }}" class="d-inline"
+                  onsubmit="return confirm('确认删除领料单 {{ r.order_no }}？删除后库存将恢复。')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger" title="删除">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="10" class="text-center text-muted py-4">暂无数据</td></tr>
+          {% endfor %}
+        </tbody>
+        {% if rows %}
+        <tfoot class="table-light">
+          <tr>
+            <td colspan="4" class="text-end fw-semibold">合计：</td>
+            <td class="fw-bold" id="totalQty">{{ rows|sum(attribute='quantity') }}</td>
+            <td class="fw-bold text-primary" id="totalAmt">{{ "%.2f"|format(rows|sum(attribute='total_amount')) }}</td>
+            <td colspan="4"></td>
+          </tr>
+        </tfoot>
+        {% endif %}
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+.sortable:hover { background: #eef2ff; }
+.sort-icon { font-size: 11px; color: #94a3b8; }
+.sort-asc .sort-icon::before { content: "\F282"; }
+.sort-desc .sort-icon::before { content: "\F27E"; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let sortCol = -1, sortDir = 1;
+document.querySelectorAll('.sortable').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = parseInt(th.dataset.col);
+    if (sortCol === col) { sortDir *= -1; } else { sortCol = col; sortDir = 1; }
+    document.querySelectorAll('.sortable').forEach(t => t.classList.remove('sort-asc','sort-desc'));
+    th.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
+    sortTable(col, sortDir);
+  });
+});
+
+function sortTable(col, dir) {
+  const tbody = document.getElementById('tableBody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  rows.sort((a, b) => {
+    const av = a.cells[col]?.innerText.trim() || '';
+    const bv = b.cells[col]?.innerText.trim() || '';
+    const an = parseFloat(av.replace(/,/g,'')), bn = parseFloat(bv.replace(/,/g,''));
+    if (!isNaN(an) && !isNaN(bn)) return (an - bn) * dir;
+    return av.localeCompare(bv, 'zh') * dir;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+</script>
+{% endblock %}

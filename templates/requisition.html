@@ -1,0 +1,365 @@
+{% extends "base.html" %}
+{% block title %}新建领料单{% endblock %}
+{% block page_title %}新建领料单{% endblock %}
+
+{% block extra_head %}
+<style>
+.search-wrap { position:relative; }
+.search-input {
+  width:100%; padding:6px 10px; font-size:13px;
+  border:1px solid #e2e8f0; border-radius:6px;
+  outline:none; transition:border-color .2s;
+}
+.search-input:focus { border-color:#6366f1; box-shadow:0 0 0 2px rgba(99,102,241,.15); }
+.search-dropdown {
+  position:absolute; top:100%; left:0; right:0; z-index:999;
+  background:#fff; border:1px solid #e2e8f0; border-radius:6px;
+  box-shadow:0 8px 24px rgba(0,0,0,.12); max-height:200px; overflow-y:auto;
+  display:none; margin-top:2px;
+}
+.search-dropdown.open { display:block; }
+.search-option {
+  padding:8px 12px; cursor:pointer; font-size:13px;
+  border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center;
+}
+.search-option:last-child { border-bottom:none; }
+.search-option:hover { background:#f0f4ff; }
+.search-option .opt-name { font-weight:500; color:#1e293b; }
+.search-option .opt-sub  { font-size:11px; color:#94a3b8; }
+.search-selected {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:5px 10px; background:#f0f4ff; border-radius:6px;
+  font-size:12px; color:#4338ca; cursor:pointer; border:1px solid #c7d2fe;
+}
+.search-selected .clear-btn { color:#94a3b8; font-size:14px; font-weight:700; }
+.search-selected .clear-btn:hover { color:#dc2626; }
+.no-result { padding:10px 12px; font-size:13px; color:#94a3b8; text-align:center; }
+/* Equipment picker in header area */
+.eq-picker-wrap { position:relative; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>新建领料单</h1>
+  <p>单价自动按移动加权平均法填入；库存不足时禁止提交</p>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <div id="errorAlert" class="alert alert-danger d-none"></div>
+
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">领料日期 *</label>
+        <input type="date" id="order_date" class="form-control" required>
+      </div>
+
+      <!-- Equipment fuzzy search -->
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">使用设备 *</label>
+        <div class="search-wrap">
+          <input type="text" class="search-input" id="eq-search" placeholder="输入设备名称或编号..."
+            autocomplete="off" oninput="filterEquipment()" onfocus="openEqDropdown()" onblur="delayCloseEq()">
+          <div class="search-dropdown" id="eq-dd"></div>
+          <div class="search-selected d-none" id="eq-sel">
+            <span id="eq-sel-text"></span>
+            <span class="clear-btn" onclick="clearEquipment()">×</span>
+          </div>
+        </div>
+        <input type="hidden" id="equipment_id">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">领料人员 *</label>
+        <select id="personnel_id" class="form-select" required>
+          <option value="">请选择人员</option>
+          {% for p in personnel %}
+          <option value="{{ p.id }}">{{ p.name }}（{{ p.employee_id }}）</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">备注</label>
+        <input type="text" id="remark" class="form-control" placeholder="选填">
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h6 class="mb-0 fw-semibold">领料明细
+        <span class="text-muted fw-normal" style="font-size:12px;">（单价自动填入移动加权均价，可修改）</span>
+      </h6>
+      <button type="button" class="btn btn-sm btn-outline-primary" onclick="addItem()">
+        <i class="bi bi-plus-circle me-1"></i>添加物料
+      </button>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th style="width:32%">物料（支持名称/编号搜索）</th>
+            <th style="width:12%">可用库存</th>
+            <th style="width:13%">件数</th>
+            <th style="width:18%">单价（元）</th>
+            <th style="width:16%">金额（元）</th>
+            <th style="width:9%">操作</th>
+          </tr>
+        </thead>
+        <tbody id="itemsBody"></tbody>
+        <tfoot>
+          <tr class="table-light">
+            <td colspan="4" class="text-end fw-semibold">合计金额：</td>
+            <td colspan="2" class="fw-bold text-primary" id="totalAmount">¥ 0.00</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2 mt-3">
+      <a href="/requisition/ledger" class="btn btn-secondary">取消</a>
+      <button type="button" class="btn btn-primary" id="submitBtn" onclick="submitForm()">
+        <i class="bi bi-check-lg me-1"></i>提交领料单
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const materials  = {{ materials  | tojson }};
+const equipments = {{ equipment  | tojson }};
+let itemCount = 0;
+const selectedMat = {};   // rowIdx -> material obj
+const priceCache  = {};   // material_id -> {avg_price, stock_qty}
+let selectedEqId = null;
+
+document.getElementById('order_date').value = new Date().toISOString().split('T')[0];
+
+/* ===== Equipment fuzzy search ===== */
+function filterEquipment() {
+  const q = document.getElementById('eq-search').value.toLowerCase().trim();
+  renderEqDropdown(q);
+}
+function openEqDropdown() { renderEqDropdown(document.getElementById('eq-search').value.toLowerCase().trim()); }
+function delayCloseEq() { setTimeout(() => document.getElementById('eq-dd').classList.remove('open'), 200); }
+
+function renderEqDropdown(q) {
+  const dd = document.getElementById('eq-dd');
+  const list = q
+    ? equipments.filter(e => e.name.toLowerCase().includes(q) || e.code.toLowerCase().includes(q) || (e.model&&e.model.toLowerCase().includes(q)))
+    : equipments;
+  if (!list.length) {
+    dd.innerHTML = '<div class="no-result">未找到匹配设备</div>';
+  } else {
+    dd.innerHTML = list.map(e => `
+      <div class="search-option" onmousedown="selectEquipment(${e.id}, '${e.name}', '${e.code}')">
+        <div>
+          <div class="opt-name">${e.name}</div>
+          <div class="opt-sub">编号：${e.code}${e.department ? ' | '+e.department : ''}</div>
+        </div>
+      </div>`).join('');
+  }
+  dd.classList.add('open');
+}
+function selectEquipment(id, name, code) {
+  selectedEqId = id;
+  document.getElementById('equipment_id').value = id;
+  document.getElementById('eq-search').classList.add('d-none');
+  document.getElementById('eq-dd').classList.remove('open');
+  document.getElementById('eq-sel-text').textContent = `${name}（${code}）`;
+  document.getElementById('eq-sel').classList.remove('d-none');
+}
+function clearEquipment() {
+  selectedEqId = null;
+  document.getElementById('equipment_id').value = '';
+  document.getElementById('eq-search').value = '';
+  document.getElementById('eq-search').classList.remove('d-none');
+  document.getElementById('eq-sel').classList.add('d-none');
+}
+
+/* ===== Material fuzzy search ===== */
+function createMaterialPicker(idx) {
+  const wrap = document.createElement('div');
+  wrap.className = 'search-wrap';
+  wrap.innerHTML = `
+    <input type="text" class="search-input" id="search-${idx}" placeholder="输入名称或编号搜索..."
+      autocomplete="off" oninput="filterMaterials(${idx})" onfocus="openMatDropdown(${idx})" onblur="delayCloseMatDD(${idx})">
+    <div class="search-dropdown" id="dd-${idx}"></div>
+    <div class="search-selected d-none" id="sel-${idx}">
+      <span id="sel-text-${idx}"></span>
+      <span class="clear-btn" onclick="clearMaterial(${idx})">×</span>
+    </div>`;
+  return wrap;
+}
+
+function filterMaterials(idx) {
+  const q = document.getElementById('search-' + idx).value.toLowerCase().trim();
+  renderMatDropdown(idx, q);
+}
+function openMatDropdown(idx) { renderMatDropdown(idx, document.getElementById('search-'+idx).value.toLowerCase().trim()); }
+function delayCloseMatDD(idx) { setTimeout(() => document.getElementById('dd-'+idx)?.classList.remove('open'), 200); }
+
+function renderMatDropdown(idx, q) {
+  const dd = document.getElementById('dd-' + idx);
+  const list = q
+    ? materials.filter(m => m.name.toLowerCase().includes(q) || m.code.toLowerCase().includes(q) || (m.model&&m.model.toLowerCase().includes(q)))
+    : materials;
+  if (!list.length) {
+    dd.innerHTML = '<div class="no-result">未找到匹配物料</div>';
+  } else {
+    dd.innerHTML = list.map(m => `
+      <div class="search-option" onmousedown="selectMaterial(${idx}, ${m.id})">
+        <div>
+          <div class="opt-name">${m.name}</div>
+          <div class="opt-sub">编号：${m.code}${m.model ? ' | 型号：'+m.model : ''}</div>
+        </div>
+        <div class="opt-sub">${m.unit || ''}</div>
+      </div>`).join('');
+  }
+  dd.classList.add('open');
+}
+
+async function selectMaterial(idx, matId) {
+  const mat = materials.find(m => m.id === matId);
+  if (!mat) return;
+  selectedMat[idx] = mat;
+  document.getElementById('search-' + idx).classList.add('d-none');
+  document.getElementById('dd-' + idx).classList.remove('open');
+  document.getElementById('sel-text-' + idx).textContent = `${mat.name}（${mat.code}）`;
+  document.getElementById('sel-' + idx).classList.remove('d-none');
+
+  // Fetch avg price
+  const stockEl = document.getElementById('stock-' + idx);
+  const priceEl = document.getElementById('price-' + idx);
+  stockEl.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+  try {
+    let data = priceCache[matId];
+    if (!data) {
+      const r = await fetch('/requisition/api/material-price/' + matId);
+      data = await r.json();
+      priceCache[matId] = data;
+    }
+    stockEl.textContent = data.stock_qty + (mat.unit ? ' ' + mat.unit : '');
+    stockEl.className = 'fw-semibold ' + (data.stock_qty <= 0 ? 'text-danger' : 'text-success');
+    if (!priceEl.value && data.avg_price > 0) priceEl.value = data.avg_price;
+  } catch(e) { stockEl.textContent = '—'; }
+  calcRow(idx);
+}
+
+function clearMaterial(idx) {
+  selectedMat[idx] = null;
+  document.getElementById('search-' + idx).value = '';
+  document.getElementById('search-' + idx).classList.remove('d-none');
+  document.getElementById('sel-' + idx).classList.add('d-none');
+  document.getElementById('stock-' + idx).textContent = '—';
+  document.getElementById('stock-' + idx).className = 'text-muted';
+  document.getElementById('price-' + idx).value = '';
+  calcRow(idx);
+}
+
+function addItem() {
+  const idx = itemCount++;
+  const tr = document.createElement('tr');
+  tr.id = 'row-' + idx;
+  tr.innerHTML = `
+    <td id="picker-cell-${idx}"></td>
+    <td><span id="stock-${idx}" class="text-muted" style="font-size:12px;">—</span></td>
+    <td><input type="number" class="form-control form-control-sm" id="qty-${idx}"
+      min="0.01" step="0.01" placeholder="数量" oninput="calcRow(${idx})"></td>
+    <td>
+      <div class="input-group input-group-sm">
+        <input type="number" class="form-control form-control-sm" id="price-${idx}"
+          min="0" step="0.0001" placeholder="自动填入" oninput="calcRow(${idx})">
+        <span class="input-group-text" style="font-size:11px;" title="移动加权均价">均</span>
+      </div>
+    </td>
+    <td><input type="number" class="form-control form-control-sm bg-light" id="total-${idx}" readonly></td>
+    <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(${idx})">
+      <i class="bi bi-dash-circle"></i></button></td>`;
+  document.getElementById('itemsBody').appendChild(tr);
+  document.getElementById('picker-cell-' + idx).appendChild(createMaterialPicker(idx));
+}
+
+function calcRow(idx) {
+  const qty   = parseFloat(document.getElementById('qty-'   + idx)?.value) || 0;
+  const price = parseFloat(document.getElementById('price-' + idx)?.value) || 0;
+  const el    = document.getElementById('total-' + idx);
+  if (el) el.value = (qty * price).toFixed(2);
+  updateTotal();
+}
+
+function updateTotal() {
+  let sum = 0;
+  document.querySelectorAll('[id^="total-"]').forEach(el => sum += parseFloat(el.value) || 0);
+  document.getElementById('totalAmount').textContent = '¥ ' + sum.toFixed(2);
+}
+
+function removeRow(idx) {
+  document.getElementById('row-' + idx)?.remove();
+  delete selectedMat[idx];
+  updateTotal();
+}
+
+function submitForm() {
+  const orderDate   = document.getElementById('order_date').value;
+  const equipmentId = document.getElementById('equipment_id').value;
+  const personnelId = document.getElementById('personnel_id').value;
+  if (!orderDate || !equipmentId || !personnelId) {
+    showError('请填写领料日期、设备和人员'); return;
+  }
+  const items = [];
+  for (const [idx, mat] of Object.entries(selectedMat)) {
+    if (!mat) continue;
+    const qty   = parseFloat(document.getElementById('qty-'   + idx)?.value);
+    const price = parseFloat(document.getElementById('price-' + idx)?.value) || 0;
+    if (qty > 0) items.push({ material_id: mat.id, quantity: qty, unit_price: price });
+  }
+  if (!items.length) { showError('请至少添加一条有效物料明细'); return; }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>提交中...';
+
+  const fd = new FormData();
+  fd.append('order_date', orderDate);
+  fd.append('equipment_id', equipmentId);
+  fd.append('personnel_id', personnelId);
+  fd.append('remark', document.getElementById('remark').value);
+  fd.append('items', JSON.stringify(items));
+
+  fetch('/requisition/create', { method:'POST', body:fd })
+    .then(async r => {
+      if (!r.ok) {
+        const err = await r.json();
+        showError(err.detail || '提交失败');
+        btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>提交领料单';
+        return;
+      }
+      const data = await r.json();
+      if (data.success) {
+        const a = document.createElement('a');
+        a.href = '/requisition/print/' + data.order_id;
+        a.download = 'requisition_' + data.order_no + '.pdf';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(() => window.location.href = '/requisition/ledger', 800);
+      }
+    })
+    .catch(e => {
+      showError('提交失败：' + e);
+      btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>提交领料单';
+    });
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorAlert');
+  el.textContent = msg; el.classList.remove('d-none');
+  window.scrollTo(0, 0);
+  setTimeout(() => el.classList.add('d-none'), 6000);
+}
+
+addItem();
+</script>
+{% endblock %}

@@ -1,0 +1,12 @@
+# Python 3.8 + Windows 7 兼容版本
+fastapi==0.95.2
+uvicorn==0.22.0
+sqlalchemy==1.4.49
+jinja2==3.1.2
+python-multipart==0.0.6
+reportlab==3.6.13
+openpyxl==3.1.2
+passlib[bcrypt]==1.7.4
+bcrypt==3.2.2
+itsdangerous==2.1.2
+python-dateutil==2.8.2
