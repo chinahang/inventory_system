@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from database import init_db, get_db
 from routers.auth import get_session_user
 from routers import (auth, materials, personnel, equipment,
-                     purchase, requisition, warehouse, reports, users, logs)
+                     purchase, requisition, warehouse, reports, users, logs, backup)
 
 app = FastAPI(title="台州海昌物流进销存系统")
 templates = Jinja2Templates(directory="templates")
@@ -28,6 +28,7 @@ app.include_router(warehouse.router)
 app.include_router(reports.router)
 app.include_router(users.router)
 app.include_router(logs.router)
+app.include_router(backup.router)
 
 
 # FastAPI 0.95 still supports on_event; use it for compatibility

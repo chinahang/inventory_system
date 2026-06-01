@@ -125,6 +125,9 @@ body { background: #f1f5f9; font-family: 'Microsoft YaHei', sans-serif; }
     <i class="bi bi-shield-lock"></i> 用户管理
   </a>
   <div class="nav-section">系统管理</div>
+  <a href="/backup" class="nav-item-link {% if '/backup' in request.url.path %}active{% endif %}">
+    <i class="bi bi-database"></i> 备份管理
+  </a>
   <a href="/logs" class="nav-item-link {% if '/logs' in request.url.path %}active{% endif %}">
     <i class="bi bi-clock-history"></i> 操作日志
   </a>
