@@ -111,10 +111,13 @@ async def create_purchase(request: Request, db: Session = Depends(get_db)):
 def ledger_page(request: Request, start_date: str = "", end_date: str = "",
                 db: Session = Depends(get_db)):
     user = require_view(request, db)
-    rows = build_rows(query_orders(db, start_date, end_date))
+    # Only query if date filters are provided
+    rows = build_rows(query_orders(db, start_date, end_date)) if start_date or end_date else []
+    today = datetime.now().strftime("%Y-%m-%d")
     return templates.TemplateResponse("purchase_ledger.html", {
         "request": request, "user": user, "rows": rows,
         "start_date": start_date, "end_date": end_date,
+        "today": today,
     })
 
 @router.get("/ledger/pdf")

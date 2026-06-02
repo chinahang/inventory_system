@@ -22,20 +22,27 @@ def logs_page(request: Request,
               module: str = "", action: str = "",
               db: Session = Depends(get_db)):
     user = admin_only(request, db)
-    query = db.query(OperationLog)
-    if start_date:
-        query = query.filter(OperationLog.created_at >= datetime.strptime(start_date, "%Y-%m-%d"))
-    if end_date:
-        query = query.filter(OperationLog.created_at < datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1))
-    if module:
-        query = query.filter(OperationLog.module == module)
-    if action:
-        query = query.filter(OperationLog.action == action)
-    logs = query.order_by(OperationLog.created_at.desc()).limit(500).all()
+    
+    # Only query if filters are provided
+    if start_date or end_date or module or action:
+        query = db.query(OperationLog)
+        if start_date:
+            query = query.filter(OperationLog.created_at >= datetime.strptime(start_date, "%Y-%m-%d"))
+        if end_date:
+            query = query.filter(OperationLog.created_at < datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1))
+        if module:
+            query = query.filter(OperationLog.module == module)
+        if action:
+            query = query.filter(OperationLog.action == action)
+        logs = query.order_by(OperationLog.created_at.desc()).limit(500).all()
+    else:
+        logs = []
 
     # Distinct modules and actions for filter dropdowns
     all_modules = db.query(OperationLog.module).distinct().all()
     all_actions = db.query(OperationLog.action).distinct().all()
+    
+    today = datetime.now().strftime("%Y-%m-%d")
 
     return templates.TemplateResponse("logs.html", {
         "request": request, "user": user, "logs": logs,
@@ -43,4 +50,5 @@ def logs_page(request: Request,
         "module_filter": module, "action_filter": action,
         "all_modules": [m[0] for m in all_modules if m[0]],
         "all_actions": [a[0] for a in all_actions if a[0]],
+        "today": today
     })

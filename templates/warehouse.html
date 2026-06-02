@@ -11,12 +11,31 @@
       <i class="bi bi-sliders me-1"></i>库存调整
     </button>
     {% endif %}
-    <a href="/warehouse/report/excel" class="btn btn-outline-success">
+    <a href="/warehouse/report/excel?qty_filter={{ qty_filter }}" class="btn btn-outline-success">
       <i class="bi bi-file-earmark-excel me-1"></i>Excel
     </a>
-    <a href="/warehouse/report/pdf" class="btn btn-outline-danger">
+    <a href="/warehouse/report/pdf?qty_filter={{ qty_filter }}" class="btn btn-outline-danger">
       <i class="bi bi-file-earmark-pdf me-1"></i>PDF
     </a>
+  </div>
+</div>
+
+<!-- Filter bar -->
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" action="/warehouse" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label mb-1" style="font-size:13px;">件数筛选</label>
+        <select name="qty_filter" class="form-select form-select-sm">
+          <option value="all" {% if qty_filter == 'all' %}selected{% endif %}>全部</option>
+          <option value="has_stock" {% if qty_filter == 'has_stock' %}selected{% endif %}>有库存</option>
+          <option value="no_stock" {% if qty_filter == 'no_stock' %}selected{% endif %}>无库存</option>
+        </select>
+      </div>
+      <div class="col-md-auto">
+        <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search me-1"></i>查询</button>
+      </div>
+    </form>
   </div>
 </div>
 

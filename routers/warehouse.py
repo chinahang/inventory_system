@@ -16,7 +16,11 @@ templates = Jinja2Templates(directory="templates")
 VIEW_ROLES   = ["管理员", "仓管员", "采购员", "普通操作员"]
 ADJUST_ROLES = ["管理员", "仓管员"]
 
-def get_stock_data(db):
+def get_stock_data(db, qty_filter="has_stock"):
+    """
+    Get stock data with quantity filter.
+    qty_filter: "all" | "has_stock" | "no_stock"
+    """
     rows = []
     for mat in db.query(Material).all():
         purchases    = db.query(PurchaseItem).filter(PurchaseItem.material_id == mat.id).all()
@@ -26,6 +30,13 @@ def get_stock_data(db):
         trq = sum(r.quantity for r in requisitions); tra = sum(r.total_amount for r in requisitions)
         taq = sum(a.quantity for a in adjustments);  taa = sum(a.amount for a in adjustments)
         avail_qty = tpq - trq + taq; avail_amt = tpa - tra + taa
+        
+        # Apply quantity filter
+        if qty_filter == "has_stock" and avail_qty <= 0:
+            continue
+        elif qty_filter == "no_stock" and avail_qty > 0:
+            continue
+        
         rows.append({
             "id": mat.id, "code": mat.code, "name": mat.name,
             "model": mat.model or "", "unit": mat.unit or "",
@@ -39,15 +50,16 @@ def get_stock_data(db):
     return rows
 
 @router.get("", response_class=HTMLResponse)
-def warehouse_page(request: Request, db: Session = Depends(get_db)):
+def warehouse_page(request: Request, qty_filter: str = "has_stock", db: Session = Depends(get_db)):
     user = get_session_user(request, db)
     if not user: return RedirectResponse("/login")
     if user.role not in VIEW_ROLES: return RedirectResponse("/")
-    rows = get_stock_data(db)
+    rows = get_stock_data(db, qty_filter)
     adjustments = db.query(StockAdjustment).order_by(StockAdjustment.created_at.desc()).limit(50).all()
     return templates.TemplateResponse("warehouse.html", {
         "request": request, "user": user, "rows": rows, "adjustments": adjustments,
-        "now": datetime.now().strftime("%Y-%m-%d %H:%M")
+        "now": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "qty_filter": qty_filter
     })
 
 @router.post("/adjust")
@@ -66,17 +78,17 @@ def adjust_stock(request: Request, material_id: int = Form(...), quantity: float
     return RedirectResponse("/warehouse", status_code=302)
 
 @router.get("/report/pdf")
-def stock_pdf(request: Request, db: Session = Depends(get_db)):
+def stock_pdf(request: Request, qty_filter: str = "all", db: Session = Depends(get_db)):
     user = get_session_user(request, db)
-    rows = get_stock_data(db)
+    rows = get_stock_data(db, qty_filter)
     pdf_bytes = generate_stock_report_pdf(rows, user.full_name if user else "")
     return StreamingResponse(iter([pdf_bytes]), media_type="application/pdf",
         headers={"Content-Disposition": "attachment; filename=stock_report.pdf"})
 
 @router.get("/report/excel")
-def stock_excel(request: Request, db: Session = Depends(get_db)):
+def stock_excel(request: Request, qty_filter: str = "all", db: Session = Depends(get_db)):
     user = get_session_user(request, db)
-    rows = get_stock_data(db)
+    rows = get_stock_data(db, qty_filter)
     excel_bytes = generate_stock_excel(rows, user.full_name if user else "")
     return StreamingResponse(iter([excel_bytes]),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
