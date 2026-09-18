@@ -9,3 +9,4 @@ __pycache__
 .python-version
 inventory.db
 backups/
+.venv3-8

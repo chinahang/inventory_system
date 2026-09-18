@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+{% block title %}权限配置{% endblock %}
+{% block page_title %}权限配置{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+  <div>
+    <h1>权限配置</h1>
+    <p>按角色配置权限：一个角色对应多项权限，保存后立即生效</p>
+  </div>
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addRoleModal">
+    <i class="bi bi-plus-lg me-1"></i>新增角色
+  </button>
+</div>
+
+{% if msg %}
+<div class="alert alert-{{ 'success' if ok else 'danger' }} py-2" style="font-size:13px;">
+  <i class="bi bi-info-circle me-1"></i>{{ msg }}
+</div>
+{% endif %}
+
+<div class="row g-3">
+  <!-- 角色列表 -->
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-people me-2"></i>角色列表</div>
+      <div class="list-group list-group-flush">
+        {% for r in roles %}
+        <a href="/roles?role_id={{ r.id }}"
+           class="list-group-item list-group-item-action {% if current and current.id == r.id %}active{% endif %}">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <strong>{{ r.name }}</strong>
+              {% if r.is_system %}<span class="badge bg-warning text-dark ms-1" style="font-size:10px;">内置</span>{% endif %}
+              <div style="font-size:12px;"
+                   class="{% if current and current.id == r.id %}text-white-50{% else %}text-muted{% endif %}">
+                {{ r.description or '—' }}
+              </div>
+            </div>
+            <span class="badge {% if current and current.id == r.id %}bg-light text-dark{% else %}bg-secondary{% endif %}">
+              {{ counts.get(r.name, 0) }} 人
+            </span>
+          </div>
+        </a>
+        {% else %}
+        <div class="list-group-item text-muted text-center py-4">暂无角色</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-body text-muted" style="font-size:12.5px;">
+        <div>
+          <i class="bi bi-lightbulb me-1"></i>说明：
+          <ul class="mb-0 mt-2 ps-3">
+            <li>用户在「用户管理」中选择角色，权限随角色生效。</li>
+            <li>「{{ super_role }}」为系统内置角色，始终拥有全部权限且不可修改，避免误操作把自己锁在系统外。</li>
+            <li>角色下仍有用户时不能删除，需先调整这些用户的角色。</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 权限矩阵 -->
+  <div class="col-lg-8">
+    {% if current %}
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-shield-lock me-2"></i>「{{ current.name }}」的权限</span>
+        {% if not current.is_system %}
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-outline-secondary"
+                  onclick="openEditRole({{ current.id }}, '{{ current.name }}', '{{ current.description or '' }}')">
+            <i class="bi bi-pencil me-1"></i>重命名
+          </button>
+          <form method="post" action="/roles/delete/{{ current.id }}" class="d-inline"
+                onsubmit="return confirm('确认删除角色 {{ current.name }}？')">
+            <button type="submit" class="btn btn-sm btn-outline-danger">
+              <i class="bi bi-trash me-1"></i>删除角色
+            </button>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+
+      <form method="post" action="/roles/save/{{ current.id }}" id="perm-matrix">
+        <div class="card-body">
+          {% if current.is_system %}
+          <div class="alert alert-warning py-2 mb-3" style="font-size:13px;">
+            <i class="bi bi-info-circle me-1"></i>
+            「{{ current.name }}」是系统内置角色，始终拥有全部 {{ total_permissions }} 项权限，无需也无法修改。
+          </div>
+          {% else %}
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="text-muted" style="font-size:13px;">
+              已授予 <strong id="granted-count">{{ selected|length }}</strong> / {{ total_permissions }} 项权限
+            </span>
+            <div>
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleAllPerms(true)">全选</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleAllPerms(false)">清空</button>
+            </div>
+          </div>
+          {% endif %}
+
+          <div class="row g-3">
+            {% for module, items in groups %}
+            {% set gidx = loop.index0 %}
+            <div class="col-md-6">
+              <div class="border rounded p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <strong style="font-size:13.5px;">{{ module }}</strong>
+                  {% if not current.is_system %}
+                  <span>
+                    <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none"
+                            onclick="toggleGroup({{ gidx }}, true)">全选</button>
+                    <span class="text-muted">/</span>
+                    <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none"
+                            onclick="toggleGroup({{ gidx }}, false)">清空</button>
+                  </span>
+                  {% endif %}
+                </div>
+                {% for code, label in items %}
+                <div class="form-check perm-group-{{ gidx }}">
+                  <input class="form-check-input" type="checkbox" name="perm" value="{{ code }}"
+                         id="perm-{{ code }}" {% if code in selected %}checked{% endif %}
+                         {% if current.is_system %}disabled{% endif %} onchange="updateCount()">
+                  <label class="form-check-label" for="perm-{{ code }}" style="font-size:13px;">
+                    {{ label }} <code style="font-size:11px;color:#94a3b8;">{{ code }}</code>
+                  </label>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        {% if not current.is_system %}
+        <div class="card-footer bg-white d-flex justify-content-end">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check2 me-1"></i>保存权限
+          </button>
+        </div>
+        {% endif %}
+      </form>
+    </div>
+    {% else %}
+    <div class="card"><div class="card-body text-center text-muted py-5">
+      请先在左侧新增一个角色
+    </div></div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- 新增角色 -->
+<div class="modal fade" id="addRoleModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">新增角色</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <form method="post" action="/roles/create">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">角色名称 *</label>
+            <input type="text" name="name" class="form-control" required placeholder="例如：财务、车间主管">
+          </div>
+          <div class="mb-2">
+            <label class="form-label">角色说明</label>
+            <input type="text" name="description" class="form-control" placeholder="选填">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">创建角色</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- 重命名角色 -->
+<div class="modal fade" id="editRoleModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">编辑角色</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <form method="post" id="editRoleForm">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">角色名称 *</label>
+            <input type="text" name="name" id="edit-role-name" class="form-control" required>
+            <div class="form-text">改名后，使用该角色的用户会自动同步到新名称。</div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">角色说明</label>
+            <input type="text" name="description" id="edit-role-desc" class="form-control">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function editableBoxes(selector) {
+  var boxes = document.querySelectorAll(selector);
+  var result = [];
+  for (var i = 0; i < boxes.length; i++) {
+    if (!boxes[i].disabled) { result.push(boxes[i]); }
+  }
+  return result;
+}
+
+function toggleGroup(idx, checked) {
+  var boxes = editableBoxes('.perm-group-' + idx + ' input[type=checkbox]');
+  for (var i = 0; i < boxes.length; i++) { boxes[i].checked = checked; }
+  updateCount();
+}
+
+function toggleAllPerms(checked) {
+  var boxes = editableBoxes('#perm-matrix input[type=checkbox]');
+  for (var i = 0; i < boxes.length; i++) { boxes[i].checked = checked; }
+  updateCount();
+}
+
+function updateCount() {
+  var el = document.getElementById('granted-count');
+  if (!el) { return; }
+  el.textContent = document.querySelectorAll('#perm-matrix input[type=checkbox]:checked').length;
+}
+
+function openEditRole(id, name, description) {
+  document.getElementById('editRoleForm').action = '/roles/update/' + id;
+  document.getElementById('edit-role-name').value = name;
+  document.getElementById('edit-role-desc').value = description;
+  new bootstrap.Modal(document.getElementById('editRoleModal')).show();
+}
+</script>
+{% endblock %}

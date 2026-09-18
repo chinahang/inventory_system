@@ -69,68 +69,98 @@ body { background: #f1f5f9; font-family: 'Microsoft YaHei', sans-serif; }
     台州海昌物流<br>进销存管理系统
   </div>
 
+  {# 菜单按权限点渲染，权限点在 utils/permissions.py 登记、在「权限配置」页面按角色勾选 #}
+  {% set perms = permissions|default([]) %}
+  {% if user %}
+  {% if 'dashboard.view' in perms %}
   <div class="nav-section">主菜单</div>
   <a href="/" class="nav-item-link {% if request.url.path == '/' %}active{% endif %}">
     <i class="bi bi-speedometer2"></i> 首页仪表盘
   </a>
+  {% endif %}
 
-  {# 采购管理：管理员 + 采购员 可见新建；其余角色只看台账 #}
-  {% if user %}
+  {% if 'purchase.create' in perms or 'purchase.view' in perms %}
   <div class="nav-section">采购管理</div>
-  {% if user.role in ['管理员', '采购员'] %}
+  {% if 'purchase.create' in perms %}
   <a href="/purchase" class="nav-item-link {% if '/purchase' in request.url.path and 'ledger' not in request.url.path %}active{% endif %}">
     <i class="bi bi-cart-plus"></i> 新建采购单
   </a>
   {% endif %}
+  {% if 'purchase.view' in perms %}
   <a href="/purchase/ledger" class="nav-item-link {% if 'purchase/ledger' in request.url.path %}active{% endif %}">
     <i class="bi bi-journal-text"></i> 采购台账
   </a>
   {% endif %}
+  {% endif %}
 
-  {# 领料管理：管理员 + 仓管员 可新建；其余只看台账 #}
-  {% if user %}
+  {% if 'requisition.create' in perms or 'requisition.view' in perms or 'warehouse.view' in perms %}
   <div class="nav-section">领料管理</div>
-  {% if user.role in ['管理员', '仓管员'] %}
+  {% if 'requisition.create' in perms %}
   <a href="/requisition" class="nav-item-link {% if '/requisition' in request.url.path and 'ledger' not in request.url.path and 'api' not in request.url.path %}active{% endif %}">
     <i class="bi bi-clipboard-plus"></i> 新建领料单
   </a>
   {% endif %}
+  {% if 'requisition.view' in perms %}
   <a href="/requisition/ledger" class="nav-item-link {% if 'requisition/ledger' in request.url.path %}active{% endif %}">
     <i class="bi bi-journal-richtext"></i> 领料台账
   </a>
+  {% endif %}
+  {% if 'warehouse.view' in perms %}
   <a href="/warehouse" class="nav-item-link {% if '/warehouse' in request.url.path %}active{% endif %}">
     <i class="bi bi-archive"></i> 库存管理
   </a>
   {% endif %}
+  {% endif %}
 
-  {% if user %}
+  {% if 'reports.view' in perms %}
   <div class="nav-section">统计报表</div>
   <a href="/reports" class="nav-item-link {% if '/reports' in request.url.path %}active{% endif %}">
     <i class="bi bi-bar-chart-line"></i> 统计报表
   </a>
   {% endif %}
 
-  {% if user and user.role == '管理员' %}
+  {% if 'material.view' in perms or 'personnel.view' in perms or 'equipment.view' in perms or 'user.view' in perms %}
   <div class="nav-section">基础数据</div>
+  {% if 'material.view' in perms %}
   <a href="/materials" class="nav-item-link {% if '/materials' in request.url.path %}active{% endif %}">
     <i class="bi bi-box"></i> 物料管理
   </a>
+  {% endif %}
+  {% if 'personnel.view' in perms %}
   <a href="/personnel" class="nav-item-link {% if '/personnel' in request.url.path %}active{% endif %}">
     <i class="bi bi-people"></i> 人员管理
   </a>
+  {% endif %}
+  {% if 'equipment.view' in perms %}
   <a href="/equipment" class="nav-item-link {% if '/equipment' in request.url.path %}active{% endif %}">
     <i class="bi bi-gear"></i> 设备管理
   </a>
+  {% endif %}
+  {% if 'user.view' in perms %}
   <a href="/users" class="nav-item-link {% if '/users' in request.url.path %}active{% endif %}">
-    <i class="bi bi-shield-lock"></i> 用户管理
+    <i class="bi bi-person-badge"></i> 用户管理
   </a>
+  {% endif %}
+  {% endif %}
+
+  {% if 'role.manage' in perms or 'backup.view' in perms or 'log.view' in perms %}
   <div class="nav-section">系统管理</div>
+  {% if 'role.manage' in perms %}
+  <a href="/roles" class="nav-item-link {% if '/roles' in request.url.path %}active{% endif %}">
+    <i class="bi bi-shield-lock"></i> 权限配置
+  </a>
+  {% endif %}
+  {% if 'backup.view' in perms %}
   <a href="/backup" class="nav-item-link {% if '/backup' in request.url.path %}active{% endif %}">
     <i class="bi bi-database"></i> 备份管理
   </a>
+  {% endif %}
+  {% if 'log.view' in perms %}
   <a href="/logs" class="nav-item-link {% if '/logs' in request.url.path %}active{% endif %}">
     <i class="bi bi-clock-history"></i> 操作日志
   </a>
+  {% endif %}
+  {% endif %}
   {% endif %}
 </div>
 

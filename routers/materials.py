@@ -4,32 +4,33 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Material
-from routers.auth import get_session_user
 from utils.log_helper import write_log
+from utils.numbering import next_code, rule_hint
+from utils.permissions import page_context, require_permission
 
 router = APIRouter(prefix="/materials", tags=["materials"])
 templates = Jinja2Templates(directory="templates")
 
-def admin_only(request, db):
-    user = get_session_user(request, db)
-    if not user: raise HTTPException(302, headers={"Location": "/login"})
-    if user.role != "管理员": raise HTTPException(403, detail="权限不足")
-    return user
+def require_manage(request, db):
+    return require_permission(request, db, "material.manage")
 
 @router.get("", response_class=HTMLResponse)
 def list_materials(request: Request, db: Session = Depends(get_db)):
-    user = get_session_user(request, db)
-    if not user: return RedirectResponse("/login")
+    user = require_permission(request, db, "material.view")
     materials = db.query(Material).all()
-    return templates.TemplateResponse("materials.html", {"request": request, "materials": materials, "user": user})
+    return templates.TemplateResponse("materials.html", page_context(
+        request, db, user, materials=materials,
+        next_code=next_code(db, "material", Material.code),
+        code_hint=rule_hint("material")))
 
 @router.post("/create")
-def create_material(request: Request, code: str = Form(...), name: str = Form(...),
+def create_material(request: Request, name: str = Form(...), code: str = Form(""),
                     model: str = Form(""), spec: str = Form(""), unit: str = Form(""),
                     safety_stock: float = Form(0), db: Session = Depends(get_db)):
-    user = admin_only(request, db)
+    user = require_manage(request, db)
+    code = (code or "").strip() or next_code(db, "material", Material.code)
     if db.query(Material).filter(Material.code == code).first():
-        raise HTTPException(400, detail="物料编码已存在")
+        raise HTTPException(400, detail="物料编码已存在：{}".format(code))
     m = Material(code=code, name=name, model=model, spec=spec, unit=unit, safety_stock=safety_stock)
     db.add(m)
     write_log(db, user, "新建", "物料", f"编码：{code} 名称：{name}", request)
@@ -37,12 +38,16 @@ def create_material(request: Request, code: str = Form(...), name: str = Form(..
     return RedirectResponse("/materials", status_code=302)
 
 @router.post("/update/{material_id}")
-def update_material(material_id: int, request: Request, code: str = Form(...), name: str = Form(...),
+def update_material(material_id: int, request: Request, name: str = Form(...), code: str = Form(""),
                     model: str = Form(""), spec: str = Form(""), unit: str = Form(""),
                     safety_stock: float = Form(0), db: Session = Depends(get_db)):
-    user = admin_only(request, db)
+    user = require_manage(request, db)
     m = db.query(Material).filter(Material.id == material_id).first()
     if not m: raise HTTPException(404)
+    code = (code or "").strip() or m.code
+    dup = db.query(Material).filter(Material.code == code, Material.id != material_id).first()
+    if dup:
+        raise HTTPException(400, detail="物料编码已存在：{}".format(code))
     m.code = code; m.name = name; m.model = model; m.spec = spec; m.unit = unit; m.safety_stock = safety_stock
     write_log(db, user, "修改", "物料", f"编码：{code} 名称：{name}", request)
     db.commit()
@@ -50,7 +55,7 @@ def update_material(material_id: int, request: Request, code: str = Form(...), n
 
 @router.post("/delete/{material_id}")
 def delete_material(material_id: int, request: Request, db: Session = Depends(get_db)):
-    user = admin_only(request, db)
+    user = require_manage(request, db)
     m = db.query(Material).filter(Material.id == material_id).first()
     if not m: raise HTTPException(404)
     write_log(db, user, "删除", "物料", f"编码：{m.code} 名称：{m.name}", request)

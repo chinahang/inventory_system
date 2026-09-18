@@ -23,6 +23,7 @@
         <a href="/requisition/ledger" class="btn btn-sm btn-outline-secondary ms-1">重置</a>
       </div>
       <div class="col-md-auto ms-auto d-flex gap-2">
+        {% if 'requisition.export' in permissions %}
         <a href="/requisition/ledger/pdf?start_date={{ start_date }}&end_date={{ end_date }}"
           class="btn btn-sm btn-outline-danger">
           <i class="bi bi-file-earmark-pdf me-1"></i>PDF
@@ -31,6 +32,7 @@
           class="btn btn-sm btn-outline-success">
           <i class="bi bi-file-earmark-excel me-1"></i>Excel
         </a>
+        {% endif %}
       </div>
     </form>
   </div>
@@ -73,6 +75,7 @@
             <td>
               <div class="d-flex gap-1">
                 <!-- Print button with paper size dropdown -->
+                {% if 'requisition.print' in permissions %}
                 <div class="dropdown">
                   <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button"
                     data-bs-toggle="dropdown" title="打印单据">
@@ -94,7 +97,8 @@
                     </li>
                   </ul>
                 </div>
-                {% if user.role == '管理员' %}
+                {% endif %}
+                {% if 'requisition.delete' in permissions %}
                 <form method="post" action="/requisition/delete/{{ r.order_id }}" class="d-inline"
                   onsubmit="return confirm('确认删除领料单 {{ r.order_no }}？删除后库存将恢复。')">
                   <button type="submit" class="btn btn-sm btn-outline-danger" title="删除">

@@ -1,5 +1,6 @@
 # Python 3.8 compatible - no walrus operator, no PEP 604 union types
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Text
+from sqlalchemy import (Column, Integer, String, Float, DateTime, Boolean,
+                        ForeignKey, Text, UniqueConstraint)
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
@@ -14,6 +15,27 @@ class User(Base):
     role = Column(String)       # 管理员/采购员/仓管员/普通操作员
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.now)
+
+
+class Role(Base):
+    """角色：一个角色对应 role_permissions 里的多条权限（一对多）。"""
+    __tablename__ = "roles"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)   # 与 users.role 的中文角色名一致
+    description = Column(String, default="")
+    is_system = Column(Boolean, default=False)       # 系统内置（管理员）不可修改
+    created_at = Column(DateTime, default=datetime.now)
+    permissions = relationship("RolePermission", back_populates="role",
+                               cascade="all, delete-orphan")
+
+
+class RolePermission(Base):
+    __tablename__ = "role_permissions"
+    __table_args__ = (UniqueConstraint("role_id", "permission", name="uq_role_permission"),)
+    id = Column(Integer, primary_key=True, index=True)
+    role_id = Column(Integer, ForeignKey("roles.id"))
+    permission = Column(String)                      # 权限点，见 utils/permissions.py
+    role = relationship("Role", back_populates="permissions")
 
 
 class Material(Base):

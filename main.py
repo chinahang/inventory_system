@@ -6,9 +6,10 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 from database import init_db, get_db
-from routers.auth import get_session_user
 from routers import (auth, materials, personnel, equipment,
-                     purchase, requisition, warehouse, reports, users, logs, backup)
+                     purchase, requisition, warehouse, reports, users, logs, backup, roles)
+from utils.permissions import (first_accessible_path, get_user_permissions,
+                               page_context, require_login)
 
 app = FastAPI(title="台州海昌物流进销存系统")
 templates = Jinja2Templates(directory="templates")
@@ -29,6 +30,7 @@ app.include_router(reports.router)
 app.include_router(users.router)
 app.include_router(logs.router)
 app.include_router(backup.router)
+app.include_router(roles.router)
 
 
 # FastAPI 0.95 still supports on_event; use it for compatibility
@@ -39,10 +41,17 @@ def on_startup():
 
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request, db: Session = Depends(get_db)):
-    user = get_session_user(request, db)
-    if not user:
-        return RedirectResponse("/login")
-    return templates.TemplateResponse("dashboard.html", {"request": request, "user": user})
+    user = require_login(request, db)
+    perms = get_user_permissions(db, user)
+    if "dashboard.view" not in perms:
+        # 没有仪表盘权限时，跳到该角色第一个可访问的页面
+        target = first_accessible_path(perms)
+        if target:
+            return RedirectResponse(target)
+        return templates.TemplateResponse("no_access.html", {
+            "request": request, "user": user, "permissions": perms,
+        }, status_code=403)
+    return templates.TemplateResponse("dashboard.html", page_context(request, db, user))
 
 
 if __name__ == "__main__":

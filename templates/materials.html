@@ -6,9 +6,9 @@
 <div class="page-header d-flex justify-content-between align-items-center">
   <div>
     <h1>物料管理</h1>
-    <p>管理系统中所有物料的基础信息</p>
+    <p>管理系统中所有物料的基础信息（物料编码支持自动编号）</p>
   </div>
-  {% if user.role == '管理员' %}
+  {% if 'material.manage' in permissions %}
   <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
     <i class="bi bi-plus-lg me-1"></i>新增物料
   </button>
@@ -22,7 +22,7 @@
         <tr>
           <th>物料编码</th><th>品名</th><th>型号</th><th>规格</th>
           <th>计量单位</th><th>安全库存</th>
-          {% if user.role == '管理员' %}<th>操作</th>{% endif %}
+          {% if 'material.manage' in permissions %}<th>操作</th>{% endif %}
         </tr>
       </thead>
       <tbody>
@@ -34,7 +34,7 @@
           <td>{{ m.spec }}</td>
           <td>{{ m.unit }}</td>
           <td>{{ m.safety_stock }}</td>
-          {% if user.role == '管理员' %}
+          {% if 'material.manage' in permissions %}
           <td>
             <button class="btn btn-sm btn-outline-primary me-1"
               onclick="editMaterial({{ m.id }}, '{{ m.code }}', '{{ m.name }}', '{{ m.model }}', '{{ m.spec }}', '{{ m.unit }}', {{ m.safety_stock }})">
@@ -68,8 +68,10 @@
       <form method="post" action="/materials/create">
         <div class="modal-body">
           <div class="row g-3">
-            <div class="col-6"><label class="form-label">物料编码 *</label>
-              <input type="text" name="code" class="form-control" required></div>
+            <div class="col-6"><label class="form-label">物料编码</label>
+              <input type="text" name="code" class="form-control"
+                placeholder="留空自动生成，例如 {{ next_code }}">
+              <div class="form-text" style="font-size:11.5px;">不填则按「{{ code_hint }}」自动编号</div></div>
             <div class="col-6"><label class="form-label">品名 *</label>
               <input type="text" name="name" class="form-control" required></div>
             <div class="col-6"><label class="form-label">型号</label>

@@ -6,36 +6,31 @@ from datetime import datetime, timedelta
 import json
 from database import get_db
 from models import PurchaseOrder, PurchaseItem, Material, Personnel, User
-from routers.auth import get_session_user
 from utils.pdf_generator import generate_purchase_ledger_pdf
 from utils.excel_generator import generate_ledger_excel
 from utils.log_helper import write_log
+from utils.numbering import next_code
+from utils.permissions import (get_user_permissions, has_permission,
+                               page_context, require_permission)
 
 router = APIRouter(prefix="/purchase", tags=["purchase"])
 templates = Jinja2Templates(directory="templates")
 
-# 采购员 + 管理员 可新建/删除采购单；其他角色只读台账
-PURCHASE_WRITE_ROLES = ["管理员", "采购员"]
-LEDGER_VIEW_ROLES    = ["管理员", "采购员", "仓管员", "普通操作员"]
+# 权限点见 utils/permissions.py，可在「权限配置」页面按角色勾选
+PERM_CREATE = "purchase.create"
+PERM_VIEW   = "purchase.view"
+PERM_DELETE = "purchase.delete"
+PERM_EXPORT = "purchase.export"
 
 def require_write(request, db):
-    user = get_session_user(request, db)
-    if not user: raise HTTPException(302, headers={"Location": "/login"})
-    if user.role not in PURCHASE_WRITE_ROLES: raise HTTPException(403, detail="权限不足")
-    return user
+    return require_permission(request, db, PERM_CREATE)
 
 def require_view(request, db):
-    user = get_session_user(request, db)
-    if not user: raise HTTPException(302, headers={"Location": "/login"})
-    if user.role not in LEDGER_VIEW_ROLES: raise HTTPException(403, detail="权限不足")
-    return user
+    return require_permission(request, db, PERM_VIEW)
 
 def generate_order_no(db):
-    today = datetime.now().strftime("%Y%m%d")
-    prefix = f"CG{today}-"
-    last = db.query(PurchaseOrder).filter(PurchaseOrder.order_no.like(f"{prefix}%")).order_by(PurchaseOrder.order_no.desc()).first()
-    seq = (int(last.order_no.split("-")[-1]) + 1) if last else 1
-    return f"{prefix}{seq:03d}"
+    """采购单号：CG + YYYYMMDD + - + 3位流水，例 CG20240917-001"""
+    return next_code(db, "purchase", PurchaseOrder.order_no)
 
 def build_rows(orders):
     rows = []
@@ -67,18 +62,17 @@ def query_orders(db, start_date, end_date):
 
 @router.get("", response_class=HTMLResponse)
 def purchase_page(request: Request, db: Session = Depends(get_db)):
-    user = get_session_user(request, db)
-    if not user: return RedirectResponse("/login")
-    if user.role not in PURCHASE_WRITE_ROLES: return RedirectResponse("/")
+    user = require_view(request, db)
+    if PERM_CREATE not in get_user_permissions(db, user):
+        return RedirectResponse("/")
     personnel = db.query(Personnel).filter(Personnel.is_active == True).all()
     materials = db.query(Material).all()
     materials_data = [{"id": m.id, "code": m.code, "name": m.name,
                        "model": m.model or "", "spec": m.spec or "", "unit": m.unit or ""}
                       for m in materials]
-    return templates.TemplateResponse("purchase.html", {
-        "request": request, "user": user,
-        "personnel": personnel, "materials": materials_data
-    })
+    return templates.TemplateResponse("purchase.html", page_context(
+        request, db, user,
+        personnel=personnel, materials=materials_data))
 
 @router.post("/create")
 async def create_purchase(request: Request, db: Session = Depends(get_db)):
@@ -114,21 +108,24 @@ def ledger_page(request: Request, start_date: str = "", end_date: str = "",
     # Only query if date filters are provided
     rows = build_rows(query_orders(db, start_date, end_date)) if start_date or end_date else []
     today = datetime.now().strftime("%Y-%m-%d")
-    return templates.TemplateResponse("purchase_ledger.html", {
-        "request": request, "user": user, "rows": rows,
-        "start_date": start_date, "end_date": end_date,
-        "today": today,
-    })
+    return templates.TemplateResponse("purchase_ledger.html", page_context(
+        request, db, user, rows=rows,
+        start_date=start_date, end_date=end_date,
+        today=today))
 
 @router.get("/ledger/pdf")
-def ledger_pdf(start_date: str = "", end_date: str = "", db: Session = Depends(get_db)):
+def ledger_pdf(request: Request, start_date: str = "", end_date: str = "",
+               db: Session = Depends(get_db)):
+    require_permission(request, db, PERM_EXPORT)
     rows = build_rows(query_orders(db, start_date, end_date))
     pdf_bytes = generate_purchase_ledger_pdf(rows, start_date, end_date)
     return StreamingResponse(iter([pdf_bytes]), media_type="application/pdf",
         headers={"Content-Disposition": "attachment; filename=purchase_ledger.pdf"})
 
 @router.get("/ledger/excel")
-def ledger_excel(start_date: str = "", end_date: str = "", db: Session = Depends(get_db)):
+def ledger_excel(request: Request, start_date: str = "", end_date: str = "",
+                 db: Session = Depends(get_db)):
+    require_permission(request, db, PERM_EXPORT)
     rows = build_rows(query_orders(db, start_date, end_date))
     columns = ["单号","采购日期","物料名称","型号","件数","单价(元)","总金额(元)","采购员","操作员","供应商联系方式","备注"]
     data = [[r["order_no"],r["order_date"],r["material_name"],r["material_model"],
@@ -141,9 +138,7 @@ def ledger_excel(start_date: str = "", end_date: str = "", db: Session = Depends
 
 @router.post("/delete/{order_id}")
 def delete_purchase(order_id: int, request: Request, db: Session = Depends(get_db)):
-    user = get_session_user(request, db)
-    if not user: raise HTTPException(302, headers={"Location": "/login"})
-    if user.role != "管理员": raise HTTPException(403, detail="仅管理员可删除采购单")
+    user = require_permission(request, db, PERM_DELETE)
     order = db.query(PurchaseOrder).filter(PurchaseOrder.id == order_id).first()
     if not order: raise HTTPException(404)
     write_log(db, user, "删除", "采购单", f"单号：{order.order_no}", request)

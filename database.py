@@ -26,7 +26,8 @@ def init_db():
     from models import (User, Material, Personnel, Equipment,
                         PurchaseOrder, PurchaseItem,
                         RequisitionOrder, RequisitionItem,
-                        StockAdjustment, OperationLog)
+                        StockAdjustment, OperationLog,
+                        Role, RolePermission)
     Base.metadata.create_all(bind=engine)
 
     # Auto-migrate: add columns that may not exist in older DBs
@@ -47,8 +48,59 @@ def init_db():
                 is_active=True,
             ))
             db.commit()
+
+        # Seed built-in roles + their default permissions
+        _seed_roles(db)
     finally:
         db.close()
+
+
+def _seed_roles(db):
+    """内置角色与默认权限。
+
+    只在角色首次创建时写入默认权限，之后以「权限配置」页面为准，
+    重启不会覆盖管理员在页面上的调整。
+    """
+    from models import Role, RolePermission, User
+    from utils.permissions import (DEFAULT_ROLE_PERMISSIONS,
+                                   DEFAULT_ROLE_DESCRIPTIONS, SUPER_ROLE)
+    changed = False
+
+    for name, perms in DEFAULT_ROLE_PERMISSIONS.items():
+        role = db.query(Role).filter(Role.name == name).first()
+        if role:
+            continue
+        role = Role(name=name,
+                    description=DEFAULT_ROLE_DESCRIPTIONS.get(name, ""),
+                    is_system=(name == SUPER_ROLE))
+        db.add(role)
+        db.flush()
+        for code in (perms or []):
+            db.add(RolePermission(role_id=role.id, permission=code))
+        changed = True
+
+    # users 表里出现过的其它角色名，补建角色并给只读默认权限，
+    # 避免历史数据里的自定义角色升级后一个页面都进不去
+    read_only = DEFAULT_ROLE_PERMISSIONS.get("普通操作员") or []
+    used_roles = db.query(User.role).distinct().all()
+    for row in used_roles:
+        name = row[0]
+        if not name:
+            continue
+        if db.query(Role).filter(Role.name == name).first():
+            continue
+        role = Role(name=name,
+                    description="由历史用户数据自动创建，默认只读权限，可在权限配置中调整",
+                    is_system=(name == SUPER_ROLE))
+        db.add(role)
+        db.flush()
+        if name != SUPER_ROLE:
+            for code in read_only:
+                db.add(RolePermission(role_id=role.id, permission=code))
+        changed = True
+
+    if changed:
+        db.commit()
 
 
 def _migrate(eng):

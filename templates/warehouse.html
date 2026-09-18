@@ -6,17 +6,19 @@
 <div class="page-header d-flex justify-content-between align-items-center">
   <div><h1>库存管理</h1><p>实时库存查看与盘盈盘亏调整</p></div>
   <div class="d-flex gap-2">
-    {% if user.role in ['管理员', '仓管员'] %}
+    {% if 'warehouse.adjust' in permissions %}
     <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#adjustModal">
       <i class="bi bi-sliders me-1"></i>库存调整
     </button>
     {% endif %}
+    {% if 'warehouse.export' in permissions %}
     <a href="/warehouse/report/excel?qty_filter={{ qty_filter }}" class="btn btn-outline-success">
       <i class="bi bi-file-earmark-excel me-1"></i>Excel
     </a>
     <a href="/warehouse/report/pdf?qty_filter={{ qty_filter }}" class="btn btn-outline-danger">
       <i class="bi bi-file-earmark-pdf me-1"></i>PDF
     </a>
+    {% endif %}
   </div>
 </div>
 
@@ -157,7 +159,7 @@
 </div>
 {% endif %}
 
-{% if user.role in ['管理员', '仓管员'] %}
+{% if 'warehouse.adjust' in permissions %}
 <div class="modal fade" id="adjustModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">

@@ -6,22 +6,20 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from database import get_db
 from models import RequisitionOrder, PurchaseOrder, PurchaseItem, RequisitionItem, StockAdjustment, Material
-from routers.auth import get_session_user
 from utils.pdf_generator import generate_report_pdf
 from utils.excel_generator import generate_report_excel
+from utils.permissions import page_context, require_any, require_permission
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 templates = Jinja2Templates(directory="templates")
 
-VIEW_ROLES = ["管理员", "采购员", "仓管员", "普通操作员"]
+# 权限点见 utils/permissions.py，可在「权限配置」页面按角色勾选
+PERM_VIEW   = "reports.view"
+PERM_EXPORT = "reports.export"
 
 
 def _require_view(request, db):
-    user = get_session_user(request, db)
-    if not user:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=302, headers={"Location": "/login"})
-    return user
+    return require_permission(request, db, PERM_VIEW)
 
 
 def build_equipment_report(db, start_date, end_date):
@@ -97,21 +95,22 @@ def reports_page(request: Request,
     user = _require_view(request, db)
     equipment_rows = build_equipment_report(db, start_date, end_date)
     personnel_rows = build_personnel_report(db, start_date, end_date)
-    return templates.TemplateResponse("reports.html", {
-        "request": request, "user": user,
-        "report_type": report_type,
-        "equipment_rows": equipment_rows,
-        "personnel_rows": personnel_rows,
-        "start_date": start_date,
-        "end_date": end_date,
-    })
+    return templates.TemplateResponse("reports.html", page_context(
+        request, db, user,
+        report_type=report_type,
+        equipment_rows=equipment_rows,
+        personnel_rows=personnel_rows,
+        start_date=start_date,
+        end_date=end_date))
 
 
 @router.get("/pdf")
-def reports_pdf(report_type: str = "equipment",
+def reports_pdf(request: Request,
+                report_type: str = "equipment",
                 start_date: str = "",
                 end_date: str = "",
                 db: Session = Depends(get_db)):
+    require_permission(request, db, PERM_EXPORT)
     if report_type == "equipment":
         rows = build_equipment_report(db, start_date, end_date)
         columns = ["设备名称", "设备编码", "所在部门", "总领料件数", "总领料金额(元)"]
@@ -132,10 +131,12 @@ def reports_pdf(report_type: str = "equipment",
 
 
 @router.get("/excel")
-def reports_excel(report_type: str = "equipment",
+def reports_excel(request: Request,
+                  report_type: str = "equipment",
                   start_date: str = "",
                   end_date: str = "",
                   db: Session = Depends(get_db)):
+    require_permission(request, db, PERM_EXPORT)
     if report_type == "equipment":
         rows = build_equipment_report(db, start_date, end_date)
         columns = ["设备名称", "设备编码", "所在部门", "总领料件数", "总领料金额(元)"]
@@ -167,7 +168,9 @@ def _add_months(dt, months):
 
 
 @router.get("/api/dashboard")
-def dashboard_data(db: Session = Depends(get_db)):
+def dashboard_data(request: Request, db: Session = Depends(get_db)):
+    # 仪表盘取数：报表查看权限或仪表盘权限均可
+    require_any(request, db, [PERM_VIEW, "dashboard.view"])
     from routers.warehouse import get_stock_data
     # Purchase trend last 6 months - pure stdlib
     purchase_trend = []

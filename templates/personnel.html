@@ -5,7 +5,7 @@
 {% block content %}
 <div class="page-header d-flex justify-content-between align-items-center">
   <div><h1>人员管理</h1><p>管理采购员、领料人等相关人员信息</p></div>
-  {% if user.role == '管理员' %}
+  {% if 'personnel.manage' in permissions %}
   <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
     <i class="bi bi-plus-lg me-1"></i>新增人员
   </button>
@@ -17,7 +17,7 @@
     <table class="table table-hover mb-0">
       <thead>
         <tr><th>工号</th><th>姓名</th><th>班组</th><th>角色</th><th>联系方式</th>
-        {% if user.role == '管理员' %}<th>操作</th>{% endif %}</tr>
+        {% if 'personnel.manage' in permissions %}<th>操作</th>{% endif %}</tr>
       </thead>
       <tbody>
         {% for p in personnel %}
@@ -27,7 +27,7 @@
           <td>{{ p.team }}</td>
           <td><span class="badge bg-secondary">{{ p.role }}</span></td>
           <td>{{ p.phone }}</td>
-          {% if user.role == '管理员' %}
+          {% if 'personnel.manage' in permissions %}
           <td>
             <button class="btn btn-sm btn-outline-primary me-1"
               onclick="editPerson({{ p.id }},'{{ p.employee_id }}','{{ p.name }}','{{ p.team }}','{{ p.phone }}','{{ p.role }}')">
@@ -58,8 +58,10 @@
           <div class="row g-3">
             <div class="col-6"><label class="form-label">姓名 *</label>
               <input type="text" name="name" class="form-control" required></div>
-            <div class="col-6"><label class="form-label">工号 *</label>
-              <input type="text" name="employee_id" class="form-control" required></div>
+            <div class="col-6"><label class="form-label">工号</label>
+              <input type="text" name="employee_id" class="form-control"
+                placeholder="留空自动生成，例如 {{ next_code }}">
+              <div class="form-text" style="font-size:11.5px;">不填则按「{{ code_hint }}」自动编号</div></div>
             <div class="col-6"><label class="form-label">班组</label>
               <input type="text" name="team" class="form-control"></div>
             <div class="col-6"><label class="form-label">联系方式</label>

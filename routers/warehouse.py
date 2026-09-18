@@ -5,16 +5,19 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 from database import get_db
 from models import Material, PurchaseItem, RequisitionItem, StockAdjustment
-from routers.auth import get_session_user
 from utils.pdf_generator import generate_stock_report_pdf
 from utils.excel_generator import generate_stock_excel
 from utils.log_helper import write_log
+from utils.permissions import (get_user_permissions, page_context,
+                               require_permission)
 
 router = APIRouter(prefix="/warehouse", tags=["warehouse"])
 templates = Jinja2Templates(directory="templates")
 
-VIEW_ROLES   = ["管理员", "仓管员", "采购员", "普通操作员"]
-ADJUST_ROLES = ["管理员", "仓管员"]
+# 权限点见 utils/permissions.py，可在「权限配置」页面按角色勾选
+PERM_VIEW   = "warehouse.view"
+PERM_ADJUST = "warehouse.adjust"
+PERM_EXPORT = "warehouse.export"
 
 def get_stock_data(db, qty_filter="has_stock"):
     """
@@ -51,23 +54,18 @@ def get_stock_data(db, qty_filter="has_stock"):
 
 @router.get("", response_class=HTMLResponse)
 def warehouse_page(request: Request, qty_filter: str = "has_stock", db: Session = Depends(get_db)):
-    user = get_session_user(request, db)
-    if not user: return RedirectResponse("/login")
-    if user.role not in VIEW_ROLES: return RedirectResponse("/")
+    user = require_permission(request, db, PERM_VIEW)
     rows = get_stock_data(db, qty_filter)
     adjustments = db.query(StockAdjustment).order_by(StockAdjustment.created_at.desc()).limit(50).all()
-    return templates.TemplateResponse("warehouse.html", {
-        "request": request, "user": user, "rows": rows, "adjustments": adjustments,
-        "now": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "qty_filter": qty_filter
-    })
+    return templates.TemplateResponse("warehouse.html", page_context(
+        request, db, user, rows=rows, adjustments=adjustments,
+        now=datetime.now().strftime("%Y-%m-%d %H:%M"),
+        qty_filter=qty_filter))
 
 @router.post("/adjust")
 def adjust_stock(request: Request, material_id: int = Form(...), quantity: float = Form(...),
                  amount: float = Form(...), reason: str = Form(...), db: Session = Depends(get_db)):
-    user = get_session_user(request, db)
-    if not user: raise HTTPException(302, headers={"Location": "/login"})
-    if user.role not in ADJUST_ROLES: raise HTTPException(403, detail="权限不足")
+    user = require_permission(request, db, PERM_ADJUST)
     mat = db.query(Material).filter(Material.id == material_id).first()
     adj = StockAdjustment(material_id=material_id, quantity=quantity, amount=amount,
                           reason=reason, operator_id=user.id)
@@ -79,7 +77,7 @@ def adjust_stock(request: Request, material_id: int = Form(...), quantity: float
 
 @router.get("/report/pdf")
 def stock_pdf(request: Request, qty_filter: str = "all", db: Session = Depends(get_db)):
-    user = get_session_user(request, db)
+    user = require_permission(request, db, PERM_EXPORT)
     rows = get_stock_data(db, qty_filter)
     pdf_bytes = generate_stock_report_pdf(rows, user.full_name if user else "")
     return StreamingResponse(iter([pdf_bytes]), media_type="application/pdf",
@@ -87,7 +85,7 @@ def stock_pdf(request: Request, qty_filter: str = "all", db: Session = Depends(g
 
 @router.get("/report/excel")
 def stock_excel(request: Request, qty_filter: str = "all", db: Session = Depends(get_db)):
-    user = get_session_user(request, db)
+    user = require_permission(request, db, PERM_EXPORT)
     rows = get_stock_data(db, qty_filter)
     excel_bytes = generate_stock_excel(rows, user.full_name if user else "")
     return StreamingResponse(iter([excel_bytes]),

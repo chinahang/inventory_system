@@ -31,10 +31,12 @@
         <a href="/purchase/ledger" class="btn btn-sm btn-outline-secondary ms-1">重置</a>
       </div>
       <div class="col-md-auto ms-auto d-flex gap-2">
+        {% if 'purchase.export' in permissions %}
         <a href="/purchase/ledger/pdf?start_date={{ start_date }}&end_date={{ end_date }}"
           class="btn btn-sm btn-outline-danger"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a>
         <a href="/purchase/ledger/excel?start_date={{ start_date }}&end_date={{ end_date }}"
           class="btn btn-sm btn-outline-success"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+        {% endif %}
       </div>
     </form>
   </div>
@@ -79,7 +81,7 @@
             <td><span style="font-size:12px;">{{ r.supplier_contact }}</span></td>
             <td><span style="font-size:12px;color:#64748b;">{{ r.remark }}</span></td>
             <td>
-              {% if user.role == '管理员' %}
+              {% if 'purchase.delete' in permissions %}
               <form method="post" action="/purchase/delete/{{ r.order_id }}" class="d-inline"
                 onsubmit="return confirm('确认删除采购单 {{ r.order_no }}？删除后库存将同步扣减。')">
                 <button type="submit" class="btn btn-sm btn-outline-danger" title="删除">

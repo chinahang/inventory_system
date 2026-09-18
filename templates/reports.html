@@ -30,6 +30,7 @@
         <a href="/reports" class="btn btn-sm btn-outline-secondary ms-1">重置</a>
       </div>
       <div class="col-md-auto ms-auto d-flex gap-2">
+        {% if 'reports.export' in permissions %}
         <a href="/reports/pdf?report_type={{ report_type }}&start_date={{ start_date }}&end_date={{ end_date }}"
           class="btn btn-sm btn-outline-danger">
           <i class="bi bi-file-earmark-pdf me-1"></i>PDF
@@ -38,6 +39,7 @@
           class="btn btn-sm btn-outline-success">
           <i class="bi bi-file-earmark-excel me-1"></i>Excel
         </a>
+        {% endif %}
       </div>
     </form>
   </div>

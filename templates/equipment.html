@@ -5,7 +5,7 @@
 {% block content %}
 <div class="page-header d-flex justify-content-between align-items-center">
   <div><h1>设备管理</h1><p>管理领料关联的生产设备信息</p></div>
-  {% if user.role == '管理员' %}
+  {% if 'equipment.manage' in permissions %}
   <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
     <i class="bi bi-plus-lg me-1"></i>新增设备
   </button>
@@ -17,7 +17,7 @@
     <table class="table table-hover mb-0">
       <thead>
         <tr><th>设备编码</th><th>设备名称</th><th>型号</th><th>所在部门</th>
-        {% if user.role == '管理员' %}<th>操作</th>{% endif %}</tr>
+        {% if 'equipment.manage' in permissions %}<th>操作</th>{% endif %}</tr>
       </thead>
       <tbody>
         {% for e in equipment %}
@@ -26,7 +26,7 @@
           <td><strong>{{ e.name }}</strong></td>
           <td>{{ e.model }}</td>
           <td>{{ e.department }}</td>
-          {% if user.role == '管理员' %}
+          {% if 'equipment.manage' in permissions %}
           <td>
             <button class="btn btn-sm btn-outline-primary me-1"
               onclick="editEquip({{ e.id }},'{{ e.code }}','{{ e.name }}','{{ e.model }}','{{ e.department }}')">
@@ -55,8 +55,10 @@
       <form method="post" action="/equipment/create">
         <div class="modal-body">
           <div class="row g-3">
-            <div class="col-6"><label class="form-label">设备编码 *</label>
-              <input type="text" name="code" class="form-control" required></div>
+            <div class="col-6"><label class="form-label">设备编码</label>
+              <input type="text" name="code" class="form-control"
+                placeholder="留空自动生成，例如 {{ next_code }}">
+              <div class="form-text" style="font-size:11.5px;">不填则按「{{ code_hint }}」自动编号</div></div>
             <div class="col-6"><label class="form-label">设备名称 *</label>
               <input type="text" name="name" class="form-control" required></div>
             <div class="col-6"><label class="form-label">型号</label>

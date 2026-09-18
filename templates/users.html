@@ -4,17 +4,20 @@
 
 {% block content %}
 <div class="page-header d-flex justify-content-between align-items-center">
-  <div><h1>用户管理</h1><p>管理系统登录账号及角色权限</p></div>
+  <div><h1>用户管理</h1><p>管理系统登录账号及角色（权限在「权限配置」中按角色设置）</p></div>
+  {% if 'user.manage' in permissions %}
   <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
     <i class="bi bi-plus-lg me-1"></i>新增用户
   </button>
+  {% endif %}
 </div>
 
 <div class="card">
   <div class="card-body p-0">
     <table class="table table-hover mb-0">
       <thead>
-        <tr><th>用户名</th><th>姓名</th><th>角色</th><th>状态</th><th>创建时间</th><th>操作</th></tr>
+        <tr><th>用户名</th><th>姓名</th><th>角色</th><th>状态</th><th>创建时间</th>
+        {% if 'user.manage' in permissions %}<th>操作</th>{% endif %}</tr>
       </thead>
       <tbody>
         {% for u in users %}
@@ -40,7 +43,21 @@
             {% endif %}
           </td>
           <td style="font-size:12px;">{{ u.created_at.strftime('%Y-%m-%d') }}</td>
+          {% if 'user.manage' in permissions %}
           <td>
+            {% if u.id != user.id %}
+            <form method="post" action="/users/change-role/{{ u.id }}" class="d-inline-flex align-items-center me-1">
+              <select name="role" class="form-select form-select-sm" style="width:120px;"
+                      onchange="this.form.submit()">
+                {% for r in roles %}
+                <option value="{{ r.name }}" {% if r.name == u.role %}selected{% endif %}>{{ r.name }}</option>
+                {% endfor %}
+                {% if u.role not in roles|map(attribute='name')|list %}
+                <option value="{{ u.role }}" selected>{{ u.role }}（已删除）</option>
+                {% endif %}
+              </select>
+            </form>
+            {% endif %}
             <button class="btn btn-sm btn-outline-secondary me-1"
               onclick="resetPwd({{ u.id }}, '{{ u.username }}')">
               <i class="bi bi-key"></i> 重置密码
@@ -54,6 +71,7 @@
             </form>
             {% endif %}
           </td>
+          {% endif %}
         </tr>
         {% endfor %}
       </tbody>
@@ -78,11 +96,13 @@
               <input type="password" name="password" class="form-control" required></div>
             <div class="col-6"><label class="form-label">角色 *</label>
               <select name="role" class="form-select" required>
-                <option>管理员</option>
-                <option>采购员</option>
-                <option>仓管员</option>
-                <option>普通操作员</option>
+                {% for r in roles %}
+                <option value="{{ r.name }}">{{ r.name }}</option>
+                {% endfor %}
               </select>
+              <div class="form-text" style="font-size:11.5px;">
+                角色权限可在「权限配置」页面调整
+              </div>
             </div>
           </div>
         </div>
